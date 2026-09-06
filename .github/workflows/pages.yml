@@ -53,6 +53,8 @@ jobs:
         # Checks the URLs the browser will actually request. An earlier version
         # compared them against the same base_path that produced them, so a
         # missing separator ('/Spikeballicons/icon-192.png') passed unnoticed.
+        env:
+          EXPECTED_BASE: ${{ steps.pages.outputs.base_path }}
         run: |
           set -euo pipefail
           test -f dist/404.html    # GitHub Pages has no SPA rewrite
@@ -60,29 +62,38 @@ jobs:
 
           node --input-type=module -e '
             import { readFileSync, existsSync } from "node:fs";
+
+            const base = `${process.env.EXPECTED_BASE.replace(/\/*$/, "")}/`;
             const manifest = JSON.parse(readFileSync("dist/manifest.webmanifest", "utf8"));
-            const urls = [
-              manifest.start_url,
-              manifest.scope,
-              ...manifest.icons.map((i) => i.src),
-              ...(manifest.shortcuts ?? []).map((s) => s.url),
+            const problems = [];
+
+            // Routes only have to be well formed and inside the scope; icons
+            // additionally have to be files that were really built.
+            const routes = [
+              ["start_url", manifest.start_url],
+              ["scope", manifest.scope],
+              ...(manifest.shortcuts ?? []).map((s) => [`shortcut ${s.name}`, s.url]),
             ];
-            let failed = false;
-            for (const url of urls) {
-              if (!url.startsWith("/")) { console.error(`not absolute: ${url}`); failed = true; continue; }
-              if (url.includes("//")) { console.error(`double slash: ${url}`); failed = true; continue; }
-              // Every non-root URL must resolve to a file that was actually built.
-              const rel = url.replace(/^\//, "").split("/").slice(1).join("/");
-              if (rel && !existsSync(`dist/${rel}`)) {
-                console.error(`points at nothing: ${url} (expected dist/${rel})`);
-                failed = true;
-              }
+            const icons = manifest.icons.map((i) => [`icon ${i.sizes} ${i.purpose}`, i.src]);
+
+            for (const [label, url] of [...routes, ...icons]) {
+              if (!url.startsWith(base)) problems.push(`${label}: ${url} is not under ${base}`);
+              else if (url.slice(base.length).includes("//")) problems.push(`${label}: ${url} has a double slash`);
             }
-            console.log(urls.join("\n"));
-            if (failed) process.exit(1);
+            for (const [label, url] of icons) {
+              const file = `dist/${url.slice(base.length)}`;
+              if (!existsSync(file)) problems.push(`${label}: ${url} points at nothing (${file})`);
+            }
+
+            console.log([...routes, ...icons].map(([l, u]) => `  ${u}  (${l})`).join("\n"));
+            if (problems.length) {
+              console.error("\n" + problems.join("\n"));
+              process.exit(1);
+            }
+            console.log(`\nall manifest URLs resolve under ${base}`);
           '
 
-          grep -q "src=\"${{ steps.pages.outputs.base_path }}/assets/" dist/index.html
+          grep -q "src=\"${EXPECTED_BASE%/}/assets/" dist/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
