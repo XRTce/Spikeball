@@ -51,8 +51,12 @@ Wege sind vorbereitet.
 
 Jeder Push auf den Standard-Branch baut und veroeffentlicht die App unter
 [xrtce.github.io/Spikeball](https://xrtce.github.io/Spikeball/)
-(`.github/workflows/pages.yml`). Beim ersten Lauf schaltet der Workflow Pages
-selbst ein.
+(`.github/workflows/pages.yml`).
+
+> **Einmalig noetig:** *Settings &rarr; Pages &rarr; Build and deployment &rarr;
+> Source: **GitHub Actions***. Das Erstellen einer Pages-Site braucht
+> Administrationsrechte, die der Workflow-Token nicht hat &mdash; danach laeuft
+> alles automatisch.
 
 Weil ein Projekt-Seite unter `/<repo>/` liegt und nicht im Wurzelverzeichnis,
 setzt der Workflow `BASE_PATH`. Daraus leiten sich Asset-Pfade, Router-Basis,

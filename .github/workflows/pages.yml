@@ -28,13 +28,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Requires Pages to be switched on once, by hand:
+      #   Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+      # The workflow token cannot do it (creating a Pages site needs repository
+      # administration rights, which GITHUB_TOKEN does not carry), so this step
+      # only reads the resulting configuration - notably the base path.
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on with the "GitHub Actions" source the first time this
-          # runs, so no manual setup in the repository settings is needed.
-          enablement: true
 
       - run: npm ci
 
