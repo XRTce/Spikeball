@@ -1,0 +1,74 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [claude/spikeball-tournament-pwa-lr0hrl, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A queued deploy should wait for the running one rather than cancel it, so the
+# published site always matches the newest completed build.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on with the "GitHub Actions" source the first time this
+          # runs, so no manual setup in the repository settings is needed.
+          enablement: true
+
+      - run: npm ci
+
+      - run: npm run test
+
+      - name: Build
+        # A project site is served from https://<user>.github.io/<repo>/, so the
+        # bundle, the manifest and the service worker scope all need that prefix.
+        # base_path comes from configure-pages and already has a trailing slash.
+        run: npm run build
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Verify the built site is wired to the right base
+        run: |
+          set -e
+          test -f dist/404.html    # GitHub Pages has no SPA rewrite
+          test -f dist/.nojekyll
+          base='${{ steps.pages.outputs.base_path }}'
+          echo "expecting base: $base"
+          grep -q "\"start_url\": *\"$base\"" dist/manifest.webmanifest
+          grep -q "src=\"$base" dist/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

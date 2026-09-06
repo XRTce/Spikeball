@@ -118,6 +118,24 @@ exactly where a rendering bug would be least noticeable and most confusing.
 **No web fonts.** The system stack renders instantly, matches the platform and
 removes an entire class of layout shift.
 
+## Deployment targets
+
+The same source builds for two places, which differ in one thing: where the app
+lives on the host.
+
+| | Docker / nginx | GitHub Pages |
+|---|---|---|
+| Served from | `/` | `/Spikeball/` |
+| Deep links | nginx `try_files` rewrite | `404.html` copy of the shell |
+| Headers | cache policy + self-only CSP | whatever Pages sends |
+
+`BASE_PATH` at build time is the single input. `vite.config.ts` derives the
+asset prefix, the manifest's `start_url`/`scope`/icon paths and the service
+worker's navigation fallback from it, and `main.tsx` derives the router
+basename from `import.meta.env.BASE_URL`. The trailing slash is stripped there:
+React Router will not match `/Spikeball` against a basename of `/Spikeball/`,
+and the stripped form matches the path with or without it.
+
 ## Internationalisation
 
 All copy sits in `src/i18n/de.ts` as one nested object with `as const`. Screens

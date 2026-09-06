@@ -12,6 +12,13 @@ import './styles/base.css';
 // without a prompt, which stops the browser evicting a tournament mid-evening.
 void requestPersistentStorage();
 
+/**
+ * BASE_URL is '/' under Docker and '/Spikeball/' on GitHub Pages. React Router
+ * refuses to match '/Spikeball' against a basename of '/Spikeball/', so the
+ * trailing slash is stripped: that form matches the path with or without it.
+ */
+const routerBasename = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/';
+
 const container = document.getElementById('root');
 if (!container) throw new Error('#root missing');
 
@@ -20,7 +27,7 @@ createRoot(container).render(
     <ErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={routerBasename}>
             <App />
           </BrowserRouter>
         </ToastProvider>

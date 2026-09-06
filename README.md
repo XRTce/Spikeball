@@ -8,6 +8,7 @@
     <img src="https://img.shields.io/badge/Bundle-~140%20kB%20gzip-0b1220" alt="Bundle-Groesse">
     <img src="https://img.shields.io/badge/Lizenz-MIT-blue" alt="MIT">
   </p>
+  <p><a href="https://xrtce.github.io/Spikeball/"><strong>&rarr; App oeffnen</strong></a></p>
 </div>
 
 ---
@@ -41,7 +42,34 @@ npm install
 npm run dev            # http://localhost:5173
 ```
 
-### Mit Docker
+### Selbst hosten
+
+Rally ist ein Ordner mit statischen Dateien &mdash; jeder Webserver tut es. Zwei
+Wege sind vorbereitet.
+
+#### GitHub Pages
+
+Jeder Push auf den Standard-Branch baut und veroeffentlicht die App unter
+[xrtce.github.io/Spikeball](https://xrtce.github.io/Spikeball/)
+(`.github/workflows/pages.yml`). Beim ersten Lauf schaltet der Workflow Pages
+selbst ein.
+
+Weil ein Projekt-Seite unter `/<repo>/` liegt und nicht im Wurzelverzeichnis,
+setzt der Workflow `BASE_PATH`. Daraus leiten sich Asset-Pfade, Router-Basis,
+Manifest und Service-Worker-Scope ab &mdash; dieselben Quellen bauen also fuer
+beide Ziele:
+
+```bash
+npm run build                        # fuer die Wurzel (Docker)
+BASE_PATH=/Spikeball/ npm run build  # fuer eine GitHub-Projektseite
+```
+
+GitHub Pages kennt keine SPA-Umschreibung, deshalb legt der Build zusaetzlich
+eine `404.html` als Kopie der Startseite ab. Ein direkt geoeffneter Link wie
+`/Spikeball/new` kommt damit als HTTP 404 an, zeigt aber die richtige Ansicht;
+sobald der Service Worker aktiv ist, uebernimmt der seinen Navigations-Fallback.
+
+#### Mit Docker
 
 ```bash
 docker compose up -d --build     # http://localhost:8080
@@ -55,7 +83,8 @@ RALLY_PORT=3000 docker compose up -d --build
 
 Das Image ist ein nginx mit den statischen Dateien &mdash; keine Datenbank, kein
 Volume, nichts zu sichern. Es laeuft mit `read_only: true` und ohne zusaetzliche
-Capabilities.
+Capabilities. Anders als bei Pages gibt es hier eine echte SPA-Umschreibung,
+Cache-Header und eine Content-Security-Policy, die nur `self` erlaubt.
 
 > **Installieren aufs Handy:** Seite im Browser oeffnen &rarr; Teilen/Menue &rarr;
 > *Zum Homescreen hinzufuegen*. Erst als installierte App bekommt Rally von den
@@ -107,6 +136,8 @@ npm run test       # Vitest (Elo, Auslosung, Datenbank)
 npm run build      # Typecheck + Produktions-Build
 npm run preview    # Produktions-Build lokal ausliefern
 npm run icons      # PWA-Icons aus dem Logo neu erzeugen
+
+BASE_PATH=/Spikeball/ npm run build   # Build wie fuer GitHub Pages
 ```
 
 Weiter lesen:
