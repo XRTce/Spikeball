@@ -50,14 +50,39 @@ jobs:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
       - name: Verify the built site is wired to the right base
+        # Checks the URLs the browser will actually request. An earlier version
+        # compared them against the same base_path that produced them, so a
+        # missing separator ('/Spikeballicons/icon-192.png') passed unnoticed.
         run: |
-          set -e
+          set -euo pipefail
           test -f dist/404.html    # GitHub Pages has no SPA rewrite
           test -f dist/.nojekyll
-          base='${{ steps.pages.outputs.base_path }}'
-          echo "expecting base: $base"
-          grep -q "\"start_url\": *\"$base\"" dist/manifest.webmanifest
-          grep -q "src=\"$base" dist/index.html
+
+          node --input-type=module -e '
+            import { readFileSync, existsSync } from "node:fs";
+            const manifest = JSON.parse(readFileSync("dist/manifest.webmanifest", "utf8"));
+            const urls = [
+              manifest.start_url,
+              manifest.scope,
+              ...manifest.icons.map((i) => i.src),
+              ...(manifest.shortcuts ?? []).map((s) => s.url),
+            ];
+            let failed = false;
+            for (const url of urls) {
+              if (!url.startsWith("/")) { console.error(`not absolute: ${url}`); failed = true; continue; }
+              if (url.includes("//")) { console.error(`double slash: ${url}`); failed = true; continue; }
+              // Every non-root URL must resolve to a file that was actually built.
+              const rel = url.replace(/^\//, "").split("/").slice(1).join("/");
+              if (rel && !existsSync(`dist/${rel}`)) {
+                console.error(`points at nothing: ${url} (expected dist/${rel})`);
+                failed = true;
+              }
+            }
+            console.log(urls.join("\n"));
+            if (failed) process.exit(1);
+          '
+
+          grep -q "src=\"${{ steps.pages.outputs.base_path }}/assets/" dist/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

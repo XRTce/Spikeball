@@ -15,7 +15,15 @@ const INK = '#0B1220';
  * basename, the manifest and the service worker scope - is derived from this
  * one value, so the same source builds for both.
  */
-const base = process.env.BASE_PATH ?? '/';
+function normalizeBase(value: string | undefined): string {
+  if (!value || value === '/') return '/';
+  // actions/configure-pages reports base_path without a trailing slash
+  // ('/Spikeball'), while Vite wants one. Accept either form: without this,
+  // withBase() would emit '/Spikeballicons/icon-192.png'.
+  return value.replace(/^\/*/, '/').replace(/\/*$/, '/');
+}
+
+const base = normalizeBase(process.env.BASE_PATH);
 const withBase = (path: string) => `${base}${path.replace(/^\//, '')}`;
 
 /**
