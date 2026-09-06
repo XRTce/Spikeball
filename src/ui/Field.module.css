@@ -1,0 +1,182 @@
+.field {
+  display: block;
+  width: 100%;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+.hint {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.control {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  /* 16px prevents iOS Safari from zooming the viewport on focus. */
+  font-size: var(--text-md);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
+  appearance: none;
+}
+
+.control::placeholder { color: var(--text-subtle); }
+
+.control:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--ring);
+}
+
+.control:disabled {
+  background: var(--surface-3);
+  color: var(--text-subtle);
+}
+
+.invalid,
+.invalid:focus {
+  border-color: var(--loss-500);
+  box-shadow: 0 0 0 3px var(--loss-tint);
+}
+
+.error {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--loss-500);
+}
+
+textarea.control {
+  min-height: 5.5rem;
+  padding: var(--space-3) var(--space-4);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+
+.selectWrap { position: relative; }
+
+.selectWrap .control { padding-right: var(--space-9); }
+
+.selectChevron {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-subtle);
+}
+
+/* ---- Number stepper --------------------------------------------------- */
+.stepper {
+  display: grid;
+  grid-template-columns: var(--tap-target) minmax(0, 1fr) var(--tap-target);
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+}
+
+.stepperBtn {
+  display: grid;
+  place-items: center;
+  height: var(--tap-target);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition:
+    transform var(--motion-instant) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
+}
+.stepperBtn:active:not(:disabled) { transform: scale(0.92); }
+.stepperBtn:disabled { opacity: 0.35; pointer-events: none; }
+
+.stepperValue {
+  text-align: center;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+.stepperValue:focus { outline: none; }
+.stepperValue::-webkit-outer-spin-button,
+.stepperValue::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* ---- Switch ----------------------------------------------------------- */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-2) 0;
+  text-align: left;
+}
+
+.switchText { min-width: 0; }
+
+.switchLabel {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+}
+
+.switchHint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 3.1rem;
+  height: 1.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background-color var(--motion-base) var(--ease-out);
+}
+
+.switchOn { background: var(--brand-500); }
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--motion-base) var(--ease-spring);
+}
+
+.switchOn .knob { transform: translateX(1.3rem); }

@@ -1,0 +1,56 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.chartCard {
+  padding: var(--space-4);
+}
+
+.chartTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+
+.row { cursor: pointer; }
+
+.medal {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  color: #3b2a06;
+}
+
+.gold { background: var(--gold); }
+.silver { background: var(--silver); }
+.bronze { background: var(--bronze); color: #fff; }
+
+.form {
+  display: none;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+/* Same breakpoint as the compact table: form dots are the first thing to go. */
+@media (min-width: 26rem) {
+  .form { display: inline-flex; }
+}
+
+.formDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+.formWin { background: var(--win-500); }
+.formLoss { background: var(--loss-500); }
+
+.scope { margin-bottom: var(--space-1); }

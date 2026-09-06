@@ -1,0 +1,95 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  animation: rally-fade-in var(--motion-fast) var(--ease-out);
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: var(--app-max-width);
+  max-height: min(92dvh, 46rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-lg);
+  padding-bottom: var(--safe-bottom);
+  animation: rally-sheet-up var(--motion-base) var(--ease-out);
+}
+
+@media (min-width: 40rem) {
+  .backdrop { align-items: center; }
+  .sheet {
+    border-radius: var(--radius-xl);
+    max-height: min(86dvh, 46rem);
+    animation: rally-pop var(--motion-base) var(--ease-out);
+  }
+  .grabber { display: none; }
+}
+
+.grabber {
+  width: 2.5rem;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  margin: var(--space-3) auto var(--space-1);
+  flex: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  flex: none;
+}
+
+.headText { flex: 1; min-width: 0; }
+
+.title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.content {
+  flex: 1;
+  /* A flex item defaults to min-height:auto, which would let the content push
+     the action footer off the bottom of the sheet instead of scrolling. */
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.actions > * { flex: 1; min-width: 0; }
+
+.confirmText {
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  line-height: var(--leading-normal);
+  padding-bottom: var(--space-2);
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <mask id="k">
+      <rect width="32" height="32" fill="#fff"/>
+      <circle cx="23.5" cy="8.5" r="7.8" fill="#000"/>
+    </mask>
+    <clipPath id="c"><circle cx="13" cy="19" r="9"/></clipPath>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#0b1220"/>
+  <g mask="url(#k)">
+    <g clip-path="url(#c)" stroke="#ff6b2c" stroke-width="1.5" opacity=".5">
+      <path d="M2 14.5h22M2 23.5h22M8.5 8v22M17.5 8v22"/>
+    </g>
+    <circle cx="13" cy="19" r="9" fill="none" stroke="#ff6b2c" stroke-width="3"/>
+  </g>
+  <circle cx="23.5" cy="8.5" r="5.4" fill="#14b8a6"/>
+</svg>

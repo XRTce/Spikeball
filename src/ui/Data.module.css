@@ -1,0 +1,241 @@
+/* ---- Badge ------------------------------------------------------------ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badgeNeutral { background: var(--surface-3); color: var(--text-muted); }
+.badgeBrand { background: var(--brand-tint); color: var(--brand-600); }
+.badgeAccent { background: var(--accent-tint); color: var(--accent-600); }
+.badgeWin { background: var(--win-100); color: var(--win-500); }
+.badgeLoss { background: var(--loss-100); color: var(--loss-500); }
+.badgeWarn { background: var(--warn-100); color: var(--warn-500); }
+.badgeInfo { background: var(--info-100); color: var(--info-500); }
+
+/* ---- Avatar ----------------------------------------------------------- */
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  user-select: none;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
+}
+
+.avatarStack {
+  display: flex;
+  align-items: center;
+}
+.avatarStack > .avatar + .avatar { margin-left: -0.55rem; }
+.avatarStack > .avatar { box-shadow: 0 0 0 2px var(--surface); }
+
+/* ---- Elo delta -------------------------------------------------------- */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.deltaUp { color: var(--win-500); }
+.deltaDown { color: var(--loss-500); }
+.deltaFlat { color: var(--text-subtle); }
+
+/* ---- Stat tile -------------------------------------------------------- */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--space-2);
+}
+
+.stat {
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.statValue {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+}
+
+.statLabel {
+  margin-top: 2px;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-subtle);
+  font-weight: var(--weight-medium);
+}
+
+/* ---- Table ------------------------------------------------------------ */
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  padding: var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-subtle);
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.table thead th:first-child,
+.table tbody td:first-child {
+  text-align: left;
+}
+
+.table tbody td {
+  padding: var(--space-3) var(--space-2);
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table tbody tr:last-child td { border-bottom: 0; }
+
+.table tbody tr.highlight { background: var(--brand-tint); }
+
+.rankCell {
+  width: 2rem;
+  color: var(--text-subtle);
+  font-weight: var(--weight-semibold);
+}
+
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/*
+ * Phone-width standings. The rating is the reason the table exists, so rather
+ * than letting the row scroll sideways the two most redundant cells - matches
+ * played and the recent-form dots - are dropped on narrow screens. Both are
+ * still shown in full on the player detail screen.
+ */
+.compact th:nth-child(3),
+.compact td:nth-child(3) {
+  display: none;
+}
+
+@media (min-width: 26rem) {
+  .compact th:nth-child(3),
+  .compact td:nth-child(3) {
+    display: table-cell;
+  }
+}
+
+.nameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-medium);
+}
+
+/* ---- Progress bar ----------------------------------------------------- */
+.progress {
+  height: 6px;
+  width: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--brand-500);
+  transition: width var(--motion-slow) var(--ease-out);
+}
+
+/* Win/loss ratio bar */
+.ratio {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.ratioWin { background: var(--win-500); transition: width var(--motion-slow) var(--ease-out); }
+.ratioLoss { background: var(--loss-500); transition: width var(--motion-slow) var(--ease-out); }
+
+/* ---- Empty state ------------------------------------------------------ */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--brand-tint);
+  color: var(--brand-500);
+}
+
+.emptyTitle {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.emptyText {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  max-width: 22rem;
+}
+
+/* ---- Skeleton --------------------------------------------------------- */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-3) 25%,
+    var(--surface-2) 37%,
+    var(--surface-3) 63%
+  );
+  background-size: 300% 100%;
+  animation: rally-shimmer 1.3s ease-in-out infinite;
+}
