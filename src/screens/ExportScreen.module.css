@@ -1,0 +1,21 @@
+.previewFrame {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  background: var(--surface-3);
+}
+
+.preview {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.previewLoading {
+  display: grid;
+  place-items: center;
+  min-height: 20rem;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}

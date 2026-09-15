@@ -1,0 +1,221 @@
+/*
+ * Rally design tokens.
+ * Single source of truth for colour, type, space, radius, elevation and motion.
+ * Components must never hard-code a raw value that exists here.
+ */
+
+:root {
+  /* ---- Brand ------------------------------------------------------- */
+  --brand-50: #fff3ec;
+  --brand-100: #ffe1d0;
+  --brand-200: #ffc2a3;
+  --brand-300: #ff9c6d;
+  --brand-400: #ff8047;
+  --brand-500: #ff6b2c; /* primary */
+  --brand-600: #ed5312;
+  --brand-700: #c33f0c;
+  --brand-800: #9a3311;
+  --brand-900: #7c2d12;
+
+  --accent-100: #ccfbf1;
+  --accent-300: #5eead4;
+  --accent-400: #2dd4bf;
+  --accent-500: #14b8a6; /* secondary / net teal */
+  --accent-600: #0d9488;
+  --accent-700: #0f766e;
+
+  /* ---- Semantic status --------------------------------------------- */
+  --win-500: #16a34a;
+  --win-100: #dcfce7;
+  --loss-500: #dc2626;
+  --loss-100: #fee2e2;
+  --warn-500: #f59e0b;
+  --warn-100: #fef3c7;
+  --info-500: #3b82f6;
+  --info-100: #dbeafe;
+
+  /* Podium */
+  --gold: #f5b301;
+  --silver: #a8b3c4;
+  --bronze: #cd7f32;
+
+  /* ---- Neutral surfaces (light is the default) ---------------------- */
+  --bg: #f4f6fa;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f9fc;
+  --surface-3: #eef2f8;
+  --surface-inverted: #0b1220;
+  --border: #e2e8f2;
+  --border-strong: #cbd5e5;
+  --overlay: rgb(11 18 32 / 45%);
+
+  --text: #0b1220;
+  --text-muted: #56637d;
+  --text-subtle: #8792a8;
+  --text-on-brand: #ffffff;
+  --text-inverted: #f8fafc;
+
+  /* Tint used behind selected rows / active nav items */
+  --brand-tint: rgb(255 107 44 / 10%);
+  --brand-tint-strong: rgb(255 107 44 / 18%);
+  --accent-tint: rgb(20 184 166 / 12%);
+  --win-tint: rgb(22 163 74 / 12%);
+  --loss-tint: rgb(220 38 38 / 12%);
+
+  /* ---- Categorical palette for per-player charts -------------------- */
+  --series-1: #ff6b2c;
+  --series-2: #14b8a6;
+  --series-3: #6366f1;
+  --series-4: #e11d8f;
+  --series-5: #0ea5e9;
+  --series-6: #84cc16;
+  --series-7: #f59e0b;
+  --series-8: #8b5cf6;
+  --series-9: #ef4444;
+  --series-10: #06b6d4;
+  --series-11: #a16207;
+  --series-12: #64748b;
+
+  /* ---- Typography --------------------------------------------------- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --text-2xs: 0.6875rem; /* 11px - badge / caption */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.8125rem;  /* 13px */
+  --text-base: 0.9375rem;/* 15px - body on mobile */
+  --text-md: 1rem;       /* 16px - form controls, avoids iOS zoom */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.375rem;   /* 22px */
+  --text-2xl: 1.75rem;   /* 28px */
+  --text-3xl: 2.25rem;   /* 36px */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+
+  --tracking-tight: -0.015em;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.07em;
+
+  /* ---- Space (4px base grid) ---------------------------------------- */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3rem;
+  --space-10: 4rem;
+
+  /* ---- Radius -------------------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation ------------------------------------------------------ */
+  --shadow-xs: 0 1px 2px rgb(11 18 32 / 6%);
+  --shadow-sm: 0 1px 3px rgb(11 18 32 / 8%), 0 1px 2px rgb(11 18 32 / 4%);
+  --shadow-md: 0 4px 12px rgb(11 18 32 / 10%), 0 1px 3px rgb(11 18 32 / 5%);
+  --shadow-lg: 0 12px 32px rgb(11 18 32 / 14%), 0 2px 8px rgb(11 18 32 / 6%);
+  --shadow-brand: 0 6px 18px rgb(255 107 44 / 30%);
+  --ring: 0 0 0 3px rgb(255 107 44 / 35%);
+
+  /* ---- Motion --------------------------------------------------------- */
+  --motion-instant: 90ms;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 340ms;
+  --ease-out: cubic-bezier(0.22, 0.8, 0.28, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ---- Layout --------------------------------------------------------- */
+  --app-max-width: 30rem; /* phone-first content column */
+  --tabbar-height: 3.75rem;
+  --appbar-height: 3.5rem;
+  --tap-target: 2.75rem; /* 44px minimum */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* ---- Z index -------------------------------------------------------- */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-appbar: 20;
+  --z-tabbar: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+/* Dark theme: only surfaces, text and tints are redefined.
+   Brand ramps stay identical so the CI reads the same in both modes. */
+:root[data-theme='dark'] {
+  --bg: #070c16;
+  --bg-elevated: #111a2b;
+  --surface: #111a2b;
+  --surface-2: #17223a;
+  --surface-3: #1e2b46;
+  --surface-inverted: #f4f6fa;
+  --border: #24314b;
+  --border-strong: #33425f;
+  --overlay: rgb(3 6 12 / 65%);
+
+  --text: #eef2f9;
+  --text-muted: #9aa6bd;
+  --text-subtle: #6c7994;
+  --text-on-brand: #ffffff;
+  --text-inverted: #0b1220;
+
+  --brand-tint: rgb(255 107 44 / 16%);
+  --brand-tint-strong: rgb(255 107 44 / 26%);
+  --accent-tint: rgb(20 184 166 / 18%);
+  --win-tint: rgb(22 163 74 / 20%);
+  --loss-tint: rgb(220 38 38 / 20%);
+
+  --win-100: rgb(22 163 74 / 22%);
+  --loss-100: rgb(220 38 38 / 22%);
+  --warn-100: rgb(245 158 11 / 22%);
+  --info-100: rgb(59 130 246 / 22%);
+
+  /* Brighter series colours to hold contrast on a dark ground */
+  --series-2: #2dd4bf;
+  --series-3: #818cf8;
+  --series-4: #f472b6;
+  --series-5: #38bdf8;
+  --series-6: #a3e635;
+  --series-8: #a78bfa;
+  --series-9: #f87171;
+  --series-11: #d4a017;
+  --series-12: #94a3b8;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 45%);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 50%);
+  --shadow-lg: 0 14px 36px rgb(0 0 0 / 58%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 1ms;
+    --motion-fast: 1ms;
+    --motion-base: 1ms;
+    --motion-slow: 1ms;
+  }
+}

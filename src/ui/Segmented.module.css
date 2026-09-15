@@ -1,0 +1,82 @@
+.wrap {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-3);
+  border-radius: var(--radius-md);
+  isolation: isolate;
+}
+
+.option {
+  position: relative;
+  z-index: 1;
+  min-height: 2.4rem;
+  padding: 0 var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+
+.option:active { transform: scale(0.97); }
+
+.selected {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+
+.thumb {
+  position: absolute;
+  z-index: 0;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xs);
+  transition:
+    left var(--motion-base) var(--ease-out),
+    width var(--motion-base) var(--ease-out);
+}
+
+/* ---- Tabs (underline style, used inside a screen) --------------------- */
+.tabs {
+  position: relative;
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  position: relative;
+  padding: var(--space-3) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+
+.tabActive { color: var(--brand-600); font-weight: var(--weight-semibold); }
+
+.tabUnderline {
+  position: absolute;
+  bottom: -1px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-500);
+  transition:
+    left var(--motion-base) var(--ease-out),
+    width var(--motion-base) var(--ease-out);
+}
