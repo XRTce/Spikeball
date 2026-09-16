@@ -14,6 +14,7 @@ import {
 } from '../ui';
 import { MatchCard, ResultSheet, teamLabel } from '../components/MatchCard';
 import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
+import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import { groupRounds, scheduleProgress } from '../domain/schedule';
@@ -28,7 +29,7 @@ import {
   setMatchResult,
 } from '../db/repo';
 import { useTimedModeCountdown } from '../state/timedMode';
-import type { Match } from '../domain/types';
+import type { Match, Player } from '../domain/types';
 import css from './PlayScreen.module.css';
 
 const s = strings;
@@ -40,6 +41,8 @@ export function PlayScreen() {
 
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [availableIds, setAvailableIds] = useState<Set<string> | null>(null);
   const [seed, setSeed] = useState(1);
   const [activeRound, setActiveRound] = useState<string | null>(null);
 
@@ -77,25 +80,43 @@ export function PlayScreen() {
     );
   }
 
+  const eligiblePlayers = availableIds
+    ? view.activePlayers.filter((player) => availableIds.has(player.id))
+    : view.activePlayers;
+
   return (
     <>
       <CasualPlay
         seed={seed}
+        eligiblePlayers={eligiblePlayers}
+        filterActive={availableIds !== null}
         onReshuffle={() => setSeed((value) => value + 1)}
         onEnterResult={setResultMatch}
         onOpenPicker={() => setPickerOpen(true)}
+        onOpenAvailability={() => setAvailabilityOpen(true)}
       />
       {resultSheet}
       <PlayerPickerSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        players={view.activePlayers}
+        players={eligiblePlayers}
         ratings={view.ratings}
         teamSize={view.teamSize}
         onConfirm={async (teamA, teamB) => {
           await scheduleCasualMatch(tournament.id, teamA, teamB);
           setPickerOpen(false);
           toast.success('Spiel steht auf dem Platz');
+        }}
+      />
+      <AvailablePlayersSheet
+        open={availabilityOpen}
+        onClose={() => setAvailabilityOpen(false)}
+        players={view.activePlayers}
+        ratings={view.ratings}
+        selected={availableIds ?? new Set(view.activePlayers.map((p) => p.id))}
+        onConfirm={(ids) => {
+          setAvailableIds(new Set(ids));
+          setAvailabilityOpen(false);
         }}
       />
     </>
@@ -108,14 +129,20 @@ export function PlayScreen() {
 
 function CasualPlay({
   seed,
+  eligiblePlayers,
+  filterActive,
   onReshuffle,
   onEnterResult,
   onOpenPicker,
+  onOpenAvailability,
 }: {
   seed: number;
+  eligiblePlayers: Player[];
+  filterActive: boolean;
   onReshuffle: () => void;
   onEnterResult: (match: Match) => void;
   onOpenPicker: () => void;
+  onOpenAvailability: () => void;
 }) {
   const view = useTournamentView();
   const tournament = view.tournament!;
@@ -141,7 +168,7 @@ function CasualPlay({
 
   // Players already on the pitch are not offered for the next match.
   const busy = new Set(onCourt.flatMap((match) => [...match.teamA, ...match.teamB]));
-  const available = view.activePlayers.filter((player) => !busy.has(player.id));
+  const available = eligiblePlayers.filter((player) => !busy.has(player.id));
 
   const maxPartnerRepeats = tournament.timedMode?.maxPartnerRepeats ?? null;
 
@@ -185,6 +212,13 @@ function CasualPlay({
                   ? s.more.timerExpired
                   : countdown?.label}
             </Badge>
+          )}
+          {view.players.length > 0 && (
+            <Button variant="secondary" icon="checkCircle" onClick={onOpenAvailability}>
+              {filterActive
+                ? s.play.availableCount(eligiblePlayers.length, view.activePlayers.length)
+                : s.play.availablePlayers}
+            </Button>
           )}
           {view.players.length === 0 ? (
             <EmptyState

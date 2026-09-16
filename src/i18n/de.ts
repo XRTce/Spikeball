@@ -96,6 +96,10 @@ export const de = {
     favourite: (pct: number) => `${pct}% Siegchance`,
     teamsAssigned: (a: number, b: number, needed: number) =>
       `Team A ${a}/${needed} · Team B ${b}/${needed}`,
+    availablePlayers: 'Verfuegbare Spieler',
+    availableCount: (n: number, total: number) => `${n} von ${total} verfuegbar`,
+    selectAll: 'Alle auswaehlen',
+    selectNone: 'Alle abwaehlen',
     finish: 'Turnier abschliessen',
     finished: 'Turnier abgeschlossen',
     result: 'Ergebnis eintragen',
