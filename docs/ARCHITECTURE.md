@@ -128,7 +128,7 @@ lives on the host.
 
 | | Docker / nginx | GitHub Pages |
 |---|---|---|
-| Served from | `/` | `/Spikeball/` |
+| Served from | `/` | `/rally-roundnet/` |
 | Deep links | nginx `try_files` rewrite | `404.html` copy of the shell |
 | Headers | cache policy + self-only CSP | whatever Pages sends |
 
@@ -136,8 +136,8 @@ lives on the host.
 asset prefix, the manifest's `start_url`/`scope`/icon paths and the service
 worker's navigation fallback from it, and `main.tsx` derives the router
 basename from `import.meta.env.BASE_URL`. The trailing slash is stripped there:
-React Router will not match `/Spikeball` against a basename of `/Spikeball/`,
-and the stripped form matches the path with or without it.
+React Router will not match `/rally-roundnet` against a basename of
+`/rally-roundnet/`, and the stripped form matches the path with or without it.
 
 ## Internationalisation
 

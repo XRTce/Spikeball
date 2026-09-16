@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Bundle-~140%20kB%20gzip-0b1220" alt="Bundle-Groesse">
     <img src="https://img.shields.io/badge/Lizenz-MIT-blue" alt="MIT">
   </p>
-  <p><a href="https://xrtce.github.io/Spikeball/"><strong>&rarr; App oeffnen</strong></a></p>
+  <p><a href="https://vncwow.github.io/rally-roundnet/"><strong>&rarr; App oeffnen</strong></a></p>
 </div>
 
 ---
@@ -36,8 +36,8 @@ Ergebnisbild teilst.
 ## Loslegen
 
 ```bash
-git clone https://github.com/XRTce/Spikeball.git
-cd Spikeball
+git clone https://github.com/vncwow/rally-roundnet.git
+cd rally-roundnet
 npm install
 npm run dev            # http://localhost:5173
 ```
@@ -50,7 +50,7 @@ Wege sind vorbereitet.
 #### GitHub Pages
 
 Jeder Push auf den Standard-Branch baut und veroeffentlicht die App unter
-[xrtce.github.io/Spikeball](https://xrtce.github.io/Spikeball/)
+[vncwow.github.io/rally-roundnet](https://vncwow.github.io/rally-roundnet/)
 (`.github/workflows/pages.yml`).
 
 > **Einmalig noetig:** *Settings &rarr; Pages &rarr; Build and deployment &rarr;
@@ -64,14 +64,15 @@ Manifest und Service-Worker-Scope ab &mdash; dieselben Quellen bauen also fuer
 beide Ziele:
 
 ```bash
-npm run build                        # fuer die Wurzel (Docker)
-BASE_PATH=/Spikeball/ npm run build  # fuer eine GitHub-Projektseite
+npm run build                              # fuer die Wurzel (Docker)
+BASE_PATH=/rally-roundnet/ npm run build   # fuer eine GitHub-Projektseite
 ```
 
 GitHub Pages kennt keine SPA-Umschreibung, deshalb legt der Build zusaetzlich
 eine `404.html` als Kopie der Startseite ab. Ein direkt geoeffneter Link wie
-`/Spikeball/new` kommt damit als HTTP 404 an, zeigt aber die richtige Ansicht;
-sobald der Service Worker aktiv ist, uebernimmt der seinen Navigations-Fallback.
+`/rally-roundnet/new` kommt damit als HTTP 404 an, zeigt aber die richtige
+Ansicht; sobald der Service Worker aktiv ist, uebernimmt der seinen
+Navigations-Fallback.
 
 #### Mit Docker
 
@@ -141,7 +142,7 @@ npm run build      # Typecheck + Produktions-Build
 npm run preview    # Produktions-Build lokal ausliefern
 npm run icons      # PWA-Icons aus dem Logo neu erzeugen
 
-BASE_PATH=/Spikeball/ npm run build   # Build wie fuer GitHub Pages
+BASE_PATH=/rally-roundnet/ npm run build   # Build wie fuer GitHub Pages
 ```
 
 Weiter lesen:
