@@ -1,129 +1,24 @@
 /**
  * Public API of the sync layer. Screens and components import from here and
  * nowhere else in src/sync.
- *
- * CONTRACT STUB: the signatures and doc comments below are the agreed
- * interface. The bodies are placeholders that behave as if no sync server
- * existed, so the UI compiles and renders while the engine is built. The
- * engine replaces the bodies (it may move them into other files and re-export
- * them) without changing a signature.
  */
-import type { TournamentVisibility } from '../domain/types';
-import type { ProtectedReason, SyncErrorCode } from './protocol';
+import { db, type SyncRow } from '../db/db';
+import { SyncError } from './errors';
+import * as api from './api';
+import { readSyncAndSnapshot, writeSnapshotRows } from './snapshot';
+import { scheduleSync, runSyncNow, startSyncEngine as startEngine, forceCloseLiveSync } from './engine';
+import { onSyncNotice as subscribeNotice, type SyncNotice } from './store';
 
 export type { ProtectedReason, SyncErrorCode } from './protocol';
-
-/* ------------------------------------------------------------------------ */
-/* Errors and notices                                                         */
-/* ------------------------------------------------------------------------ */
-
-/**
- * Thrown by sync actions, and by repo mutations on a public tournament.
- *
- * Code `locked` from a repo mutation means that the change needs the admin
- * password and this device does not hold it. Nothing was written. The UI
- * shows the unlock sheet and, after a successful unlock, calls the same
- * mutation again. `wrong_password` only comes from unlock and password
- * changes.
- */
-export class SyncError extends Error {
-  readonly code: SyncErrorCode | 'wrong_password';
-  readonly reasons: ProtectedReason[];
-
-  constructor(code: SyncErrorCode | 'wrong_password', reasons: ProtectedReason[] = [], message?: string) {
-    super(message ?? code);
-    this.name = 'SyncError';
-    this.code = code;
-    this.reasons = reasons;
-  }
-}
-
-export function isLockedError(error: unknown): error is SyncError {
-  return error instanceof SyncError && error.code === 'locked';
-}
-
-/** Things the UI should tell the user about that happen outside any action. */
-export type SyncNotice =
-  /** Queued changes could not be applied on top of someone else's newer ones and were dropped. */
-  | { kind: 'dropped'; tournamentId: string; count: number }
-  /** The server refused queued changes without the password; see discardPendingChanges(). */
-  | { kind: 'locked'; tournamentId: string; reasons: ProtectedReason[] }
-  /** Someone deleted the tournament for everyone. The local copy is kept, now as a local tournament. */
-  | { kind: 'deleted'; tournamentId: string };
+export { SyncError, isLockedError } from './errors';
+export type { SyncNotice } from './store';
+export type { SyncState, SyncStatus } from './hooks';
+export { useSyncStatus, useServerAvailable, useLiveSync } from './hooks';
+export { configureSync, resetSyncEnv, type SyncEnv } from './config';
 
 /** Subscribes to notices; returns the unsubscribe function. */
 export function onSyncNotice(listener: (notice: SyncNotice) => void): () => void {
-  void listener;
-  return () => {};
-}
-
-/* ------------------------------------------------------------------------ */
-/* Status                                                                     */
-/* ------------------------------------------------------------------------ */
-
-export type SyncState =
-  /** Not a public tournament. */
-  | 'local'
-  /** Local copy equals the server's latest revision. */
-  | 'synced'
-  /** A push or pull is in flight. */
-  | 'syncing'
-  /** Changes are queued and will be pushed when possible. */
-  | 'pending'
-  /** The last attempt failed; see `error`. Queued changes are kept. */
-  | 'error';
-
-export interface SyncStatus {
-  visibility: TournamentVisibility;
-  /** 'owner' = created or published on this device, 'joined' = opened via link. null for local. */
-  role: 'owner' | 'joined' | null;
-  state: SyncState;
-  /** Queued local changes not yet on the server. */
-  pendingCount: number;
-  lastSyncedAt: number | null;
-  error: SyncErrorCode | null;
-  /** The server has an admin password for this tournament. */
-  isProtected: boolean;
-  /** Protected actions are possible on this device: no password is set, or it is remembered here. */
-  unlocked: boolean;
-  /** False until the first upload succeeded (created while offline). */
-  uploaded: boolean;
-}
-
-const LOCAL_STATUS: SyncStatus = {
-  visibility: 'local',
-  role: null,
-  state: 'local',
-  pendingCount: 0,
-  lastSyncedAt: null,
-  error: null,
-  isProtected: false,
-  unlocked: true,
-  uploaded: false,
-};
-
-/** Live sync status of one tournament. Re-renders on every change. */
-export function useSyncStatus(tournamentId: string | undefined): SyncStatus {
-  void tournamentId;
-  return LOCAL_STATUS;
-}
-
-/**
- * Whether a sync server answers at the configured URL. null while the first
- * check runs. The "public" option is only offered when this is true.
- */
-export function useServerAvailable(): boolean | null {
-  return false;
-}
-
-/**
- * Keeps one tournament live while mounted. It subscribes to the server's
- * event stream and pulls every new revision into IndexedDB, and the screens
- * re-render through their live queries. It does nothing for local
- * tournaments.
- */
-export function useLiveSync(tournamentId: string | undefined): void {
-  void tournamentId;
+  return subscribeNotice(listener);
 }
 
 /**
@@ -131,11 +26,13 @@ export function useLiveSync(tournamentId: string | undefined): void {
  * `online`, on returning to the tab, and on a timer while anything is
  * pending.
  */
-export function startSyncEngine(): void {}
+export function startSyncEngine(): void {
+  startEngine();
+}
 
 /** Pushes queued changes and pulls the latest revision now. Never throws; see useSyncStatus. */
 export async function syncNow(tournamentId: string): Promise<void> {
-  void tournamentId;
+  await runSyncNow(tournamentId);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -163,9 +60,26 @@ export function parseJoinInput(input: string): string | null {
  * The password is optional; null means anyone with the link may do anything.
  */
 export async function publishTournament(tournamentId: string, password: string | null): Promise<void> {
-  void tournamentId;
-  void password;
-  throw new SyncError('unavailable');
+  const tournament = await db.tournaments.get(tournamentId);
+  if (!tournament) throw new SyncError('rejected', [], 'Turnier nicht gefunden');
+  if (tournament.visibility === 'public') return;
+
+  await db.transaction('rw', db.tournaments, db.sync, async () => {
+    await db.tournaments.update(tournamentId, { visibility: 'public', updatedAt: Date.now() });
+    const row: SyncRow = {
+      tournamentId,
+      role: 'owner',
+      revision: 0,
+      pending: [],
+      protected: password != null,
+      adminPassword: password,
+      lastSyncedAt: null,
+      error: null,
+    };
+    await db.sync.put(row);
+  });
+
+  scheduleSync(tournamentId);
 }
 
 /**
@@ -174,12 +88,36 @@ export async function publishTournament(tournamentId: string, password: string |
  * `not_found`, `deleted`, `offline` or `unavailable`.
  */
 export async function joinTournament(tournamentId: string): Promise<void> {
-  void tournamentId;
-  throw new SyncError('unavailable');
+  const existing = await db.tournaments.get(tournamentId);
+  if (existing) {
+    if (existing.visibility === 'public') {
+      await runSyncNow(tournamentId);
+      return;
+    }
+    throw new SyncError('rejected', [], 'Diese Turnier-Id ist auf diesem Geraet bereits lokal vorhanden');
+  }
+
+  const fetched = await api.fetchTournament(tournamentId);
+  await db.transaction('rw', db.tournaments, db.players, db.matches, db.sync, async () => {
+    await db.tournaments.add({ ...fetched.snapshot.tournament, visibility: 'public' });
+    if (fetched.snapshot.players.length > 0) await db.players.bulkAdd(fetched.snapshot.players);
+    if (fetched.snapshot.matches.length > 0) await db.matches.bulkAdd(fetched.snapshot.matches);
+    const row: SyncRow = {
+      tournamentId,
+      role: 'joined',
+      revision: fetched.revision,
+      pending: [],
+      protected: fetched.protected,
+      adminPassword: null,
+      lastSyncedAt: Date.now(),
+      error: null,
+    };
+    await db.sync.put(row);
+  });
 }
 
 /* ------------------------------------------------------------------------ */
-/* Admin password                                                             */
+/* Admin password                                                            */
 /* ------------------------------------------------------------------------ */
 
 /**
@@ -188,14 +126,27 @@ export async function joinTournament(tournamentId: string): Promise<void> {
  * `unavailable`; too many wrong attempts (HTTP 429) throw `rejected`.
  */
 export async function unlockTournament(tournamentId: string, password: string): Promise<boolean> {
-  void tournamentId;
-  void password;
-  throw new SyncError('unavailable');
+  const ok = await api.unlockTournament(tournamentId, password);
+  if (!ok) return false;
+
+  await db.transaction('rw', db.sync, async () => {
+    const sync = await db.sync.get(tournamentId);
+    if (!sync) return;
+    await db.sync.update(tournamentId, {
+      adminPassword: password,
+      error: sync.error === 'locked' ? null : sync.error,
+    });
+  });
+
+  scheduleSync(tournamentId);
+  return true;
 }
 
 /** Forgets the remembered password on this device. */
 export async function lockTournament(tournamentId: string): Promise<void> {
-  void tournamentId;
+  const sync = await db.sync.get(tournamentId);
+  if (!sync) return;
+  await db.sync.update(tournamentId, { adminPassword: null });
 }
 
 /**
@@ -205,18 +156,31 @@ export async function lockTournament(tournamentId: string): Promise<void> {
  * `wrong_password`.
  */
 export async function changeTournamentPassword(tournamentId: string, next: string | null): Promise<void> {
-  void tournamentId;
-  void next;
-  throw new SyncError('unavailable');
+  const sync = await db.sync.get(tournamentId);
+  if (!sync) throw new SyncError('rejected', [], 'Kein oeffentliches Turnier');
+
+  await api.setPassword(tournamentId, sync.adminPassword, next);
+
+  await db.sync.update(tournamentId, { adminPassword: next, protected: next != null });
 }
 
 /* ------------------------------------------------------------------------ */
 /* Leaving and deleting                                                       */
 /* ------------------------------------------------------------------------ */
 
+async function removeLocalCopy(tournamentId: string): Promise<void> {
+  await db.transaction('rw', db.tournaments, db.players, db.matches, db.sync, async () => {
+    await db.matches.where('tournamentId').equals(tournamentId).delete();
+    await db.players.where('tournamentId').equals(tournamentId).delete();
+    await db.tournaments.delete(tournamentId);
+    await db.sync.delete(tournamentId);
+  });
+  forceCloseLiveSync(tournamentId);
+}
+
 /** Removes a public tournament from this device only. Everyone else keeps it. Always allowed. */
 export async function leaveTournament(tournamentId: string): Promise<void> {
-  void tournamentId;
+  await removeLocalCopy(tournamentId);
 }
 
 /**
@@ -224,8 +188,11 @@ export async function leaveTournament(tournamentId: string): Promise<void> {
  * Online only. Needs the password if one is set: throws SyncError `locked`.
  */
 export async function deleteTournamentEverywhere(tournamentId: string): Promise<void> {
-  void tournamentId;
-  throw new SyncError('unavailable');
+  const sync = await db.sync.get(tournamentId);
+  if (!sync) throw new SyncError('rejected', [], 'Kein oeffentliches Turnier');
+
+  await api.deleteTournament(tournamentId, sync.adminPassword);
+  await removeLocalCopy(tournamentId);
 }
 
 /**
@@ -234,5 +201,24 @@ export async function deleteTournamentEverywhere(tournamentId: string): Promise<
  * knows the password.
  */
 export async function discardPendingChanges(tournamentId: string): Promise<void> {
-  void tournamentId;
+  const read = await readSyncAndSnapshot(tournamentId);
+  if (!read) return;
+
+  if (read.sync.revision === 0) {
+    // Never uploaded: there is nothing server-side to reset to, just drop the queue.
+    await db.sync.update(tournamentId, { pending: [], error: null });
+    return;
+  }
+
+  const fetched = await api.fetchTournament(tournamentId);
+  await db.transaction('rw', db.tournaments, db.players, db.matches, db.sync, async () => {
+    await writeSnapshotRows(fetched.snapshot);
+    await db.sync.update(tournamentId, {
+      revision: fetched.revision,
+      protected: fetched.protected,
+      pending: [],
+      lastSyncedAt: Date.now(),
+      error: null,
+    });
+  });
 }
