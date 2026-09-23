@@ -9,6 +9,7 @@ import { TableScreen } from './screens/TableScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { PlayerDetailScreen } from './screens/PlayerDetailScreen';
 import { ExportScreen } from './screens/ExportScreen';
+import { DraftScreen } from './screens/DraftScreen';
 import { NotFoundScreen } from './screens/NotFoundScreen';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
@@ -29,6 +30,7 @@ export function App() {
           </Route>
           <Route path="player/:playerId" element={<PlayerDetailScreen />} />
           <Route path="export" element={<ExportScreen />} />
+          <Route path="draft" element={<DraftScreen />} />
         </Route>
         <Route path="*" element={<NotFoundScreen />} />
       </Routes>

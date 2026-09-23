@@ -18,7 +18,7 @@ import { cx } from '../lib/cx';
 import { strings } from '../i18n';
 import { createTournament } from '../db/repo';
 import { useTournamentList } from '../state/useTournament';
-import { DEFAULT_ELO_SETTINGS, DEFAULT_PLAY_SETTINGS, type MatchFormat } from '../domain/types';
+import { DEFAULT_ELO_SETTINGS, DEFAULT_PLAY_SETTINGS } from '../domain/types';
 import css from '../styles/forms.module.css';
 
 const s = strings;
@@ -30,7 +30,6 @@ export function CreateTournamentScreen() {
 
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>('2v2');
   const [baseElo, setBaseElo] = useState(DEFAULT_ELO_SETTINGS.baseElo);
   const [pointsToWin, setPointsToWin] = useState(DEFAULT_PLAY_SETTINGS.pointsToWin);
   const [kFactor, setKFactor] = useState(DEFAULT_ELO_SETTINGS.kFactor);
@@ -43,6 +42,10 @@ export function CreateTournamentScreen() {
   const [ratingSource, setRatingSource] = useState<'current' | 'base'>('current');
   const [advanced, setAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<'manual' | 'timed'>('manual');
+  const [freePlayHours, setFreePlayHours] = useState(1);
+  const [draftSize, setDraftSize] = useState(8);
+  const [maxPartnerRepeats, setMaxPartnerRepeats] = useState(0);
 
   const submit = async () => {
     setBusy(true);
@@ -50,7 +53,6 @@ export function CreateTournamentScreen() {
       const id = await createTournament({
         name,
         note,
-        matchFormat,
         elo: {
           baseElo,
           kFactor,
@@ -60,6 +62,14 @@ export function CreateTournamentScreen() {
         },
         play: { pointsToWin },
         ...(cloneId ? { cloneFrom: { tournamentId: cloneId, ratingSource } } : {}),
+        timedMode:
+          mode === 'timed'
+            ? {
+                freePlayMinutes: freePlayHours * 60,
+                draftSize,
+                maxPartnerRepeats: maxPartnerRepeats > 0 ? maxPartnerRepeats : null,
+              }
+            : null,
       });
       navigate(`/t/${id}`, { replace: true });
     } catch (error) {
@@ -100,20 +110,6 @@ export function CreateTournamentScreen() {
           </div>
 
           <div className={css.group}>
-            <div>
-              <div className={css.groupTitle} style={{ marginBottom: 'var(--space-2)' }}>
-                {s.create.format}
-              </div>
-              <Segmented
-                ariaLabel={s.create.format}
-                value={matchFormat}
-                onChange={setMatchFormat}
-                options={[
-                  { value: '2v2', label: s.create.doubles },
-                  { value: '1v1', label: s.create.singles },
-                ]}
-              />
-            </div>
             <NumberStepper
               label={s.create.baseElo}
               hint={s.create.baseEloHint}
@@ -123,6 +119,58 @@ export function CreateTournamentScreen() {
               max={3000}
               step={25}
             />
+          </div>
+
+          <div className={css.group}>
+            <div>
+              <div className={css.groupTitle} style={{ marginBottom: 'var(--space-2)' }}>
+                {s.create.mode}
+              </div>
+              <Segmented
+                ariaLabel={s.create.mode}
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: 'manual', label: s.create.modeManual },
+                  { value: 'timed', label: s.create.modeTimed },
+                ]}
+              />
+            </div>
+            {mode === 'timed' && (
+              <>
+                <p className={css.hint}>{s.create.modeTimedHint}</p>
+                <NumberStepper
+                  label={s.create.timedFreePlay}
+                  hint={s.create.timedFreePlayHint}
+                  value={freePlayHours}
+                  onChange={setFreePlayHours}
+                  min={1}
+                  max={12}
+                  step={1}
+                />
+                <NumberStepper
+                  label={s.create.timedDraftSize}
+                  hint={s.create.timedDraftSizeHint}
+                  value={draftSize}
+                  onChange={(value) => setDraftSize(value - (value % 2))}
+                  min={4}
+                  max={32}
+                  step={2}
+                />
+                <NumberStepper
+                  label={s.create.maxPartnerRepeats}
+                  hint={
+                    maxPartnerRepeats === 0
+                      ? s.create.maxPartnerRepeatsUnlimited
+                      : s.create.maxPartnerRepeatsHint
+                  }
+                  value={maxPartnerRepeats}
+                  onChange={setMaxPartnerRepeats}
+                  min={0}
+                  max={10}
+                />
+              </>
+            )}
           </div>
 
           {existing.length > 0 && (

@@ -26,8 +26,8 @@ Ergebnisbild teilst.
 
 | | |
 |---|---|
-| **Freies Spiel** | Die App schlaegt die naechste faire Partie vor: Wer am wenigsten gespielt hat kommt zuerst, die Teams werden nach Elo ausbalanciert und Partnerschaften rotieren. Ergebnis eintippen, fertig. |
-| **Turniermodus** | Wenn es ernst wird: Spielplan auf Knopfdruck fuer *Jeder gegen jeden*, *Schweizer System*, *K.o.* oder *Doppel-K.o.* &mdash; wahlweise nur mit den n besten Spielern. |
+| **Liga-Modus** | Dauerhaftes freies Spiel: Die App schlaegt die naechste faire Partie vor, oder du stellst die Teams selbst zusammen. Wer am wenigsten gespielt hat kommt zuerst, Partnerschaften rotieren. |
+| **Turniermodus** | Freies Spiel mit Zeitlimit. Danach draften die besten Spieler feste Teams &mdash; die bessere Haelfte waehlt sich reihum einen Partner aus der schwaecheren &mdash; und spielen ein K.o.-Bracket. |
 | **Elo pro Turnier** | Jeder Spieler hat eine Start-Elo, die sich mit jedem Ergebnis fortschreibt. Wertungen gehoeren zum Turnier, nicht global. |
 | **Spieler uebernehmen** | Ein neues Turnier kann die Spielerliste eines alten klonen &mdash; mit der aktuellen oder der urspruenglichen Wertung als neue Start-Elo. |
 | **Ergebnisbild** | Podium, Elo-Verlauf und Siegbilanz als PNG zum Teilen. |
@@ -97,14 +97,15 @@ Cache-Header und eine Content-Security-Policy, die nur `self` erlaubt.
 
 ## Bedienung in 60 Sekunden
 
-1. **Turnier anlegen.** Name, 2v2 oder 1v1, Start-Elo. Optional Spieler aus einem
-   frueheren Turnier uebernehmen.
+1. **Turnier anlegen.** Name, Start-Elo, Liga- oder Turniermodus. Optional
+   Spieler aus einem frueheren Turnier uebernehmen.
 2. **Spieler eintragen.** Namen antippen, fertig. Wer staerker ist, bekommt eine
    hoehere Start-Elo &mdash; das spart die ersten zehn Spiele Einlaufzeit.
-3. **Frei spielen.** Die App schlaegt eine Partie vor. *Auf den Platz* &rarr;
-   spielen &rarr; *Ergebnis* &rarr; die zwei grossen Plus-Knoepfe.
-4. **Turniermodus starten**, wenn ihr genug aufgewaermt seid. Format waehlen,
-   Teilnehmerzahl festlegen, Spielplan erstellen.
+3. **Frei spielen.** Die App schlaegt eine Partie vor, oder ihr stellt die
+   Teams selbst zusammen. *Auf den Platz* &rarr; spielen &rarr; *Ergebnis* &rarr;
+   die zwei grossen Plus-Knoepfe.
+4. **Im Turniermodus:** Zeitlimit starten, wenn alle da sind. Danach draften
+   die besten Spieler feste Teams fuers K.o.-Bracket.
 5. **Ergebnisbild teilen**, wenn alles durch ist.
 
 ## Projektstruktur
@@ -115,8 +116,7 @@ src/
 │   ├── elo.ts       Elo-Berechnung und Replay
 │   ├── standings.ts Tabelle und Bilanzen
 │   ├── schedule.ts  Gruppierung des Spielplans in Runden
-│   └── pairing/     Auslosung: Balance, freies Spiel, Jeder-gegen-jeden,
-│                    Schweizer System, K.o. und Doppel-K.o.
+│   └── pairing/     Auslosung: Balance, freies Spiel, Kapitaens-Draft, K.o.
 ├── db/              IndexedDB (Dexie), Repository und Backup
 ├── state/           Lesemodell und Kontexte (Theme, Spielerfarben)
 ├── ui/              Design-System: Buttons, Karten, Felder, Charts, Icons

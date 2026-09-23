@@ -1,22 +1,12 @@
-/** Doubles is the default; singles exists for warm-up/1v1 sessions. */
-export type MatchFormat = '2v2' | '1v1';
-
-export type TournamentFormat = 'round_robin' | 'swiss' | 'single_elim' | 'double_elim';
+/** Single-elimination is the only bracket format the app produces. */
+export type TournamentFormat = 'single_elim';
 
 /** `casual` = open queue, `tournament` = a generated schedule is running. */
 export type TournamentPhase = 'casual' | 'tournament';
 
 export type TournamentStatus = 'open' | 'running' | 'finished';
 
-export type MatchStage =
-  | 'casual'
-  | 'round_robin'
-  | 'swiss'
-  | 'winners'
-  | 'losers'
-  | 'grand_final'
-  | 'grand_final_reset'
-  | 'third_place';
+export type MatchStage = 'casual' | 'winners' | 'third_place';
 
 export type MatchStatus = 'scheduled' | 'done';
 
@@ -38,14 +28,10 @@ export interface EloSettings {
 export interface PlaySettings {
   /** Target score, used to pre-fill the result entry. */
   pointsToWin: number;
-  /** Number of Swiss rounds to generate. */
-  swissRounds: number;
   /** Only the n highest-rated players enter the tournament; null = everyone. */
   participantLimit: number | null;
-  /** Play a match for third place in elimination formats. */
+  /** Play a match for third place - only meaningful with at least 4 teams. */
   thirdPlaceMatch: boolean;
-  /** Double elimination: the winners-bracket team must be beaten twice. */
-  grandFinalReset: boolean;
 }
 
 export interface BracketTeam {
@@ -62,6 +48,23 @@ export interface BracketMeta {
   createdAt: number;
 }
 
+/**
+ * Turniermodus: a time-boxed free-play phase, after which the best
+ * `draftSize` players are drafted into fixed teams for a single-elimination
+ * bracket. `null` on a tournament means Liga-Modus - open-ended free play
+ * that never transitions into a bracket.
+ */
+export interface TimedModeSettings {
+  /** Configured duration of the free-play phase. */
+  freePlayMinutes: number;
+  /** X - how many of the best players enter the bracket. Always even. */
+  draftSize: number;
+  /** Set when the tournament master manually starts the countdown. */
+  timerStartedAt: number | null;
+  /** Max times two players may share a team before auto-matching avoids repeating it; null = unlimited. */
+  maxPartnerRepeats: number | null;
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -70,7 +73,6 @@ export interface Tournament {
   updatedAt: number;
   phase: TournamentPhase;
   status: TournamentStatus;
-  matchFormat: MatchFormat;
   format: TournamentFormat | null;
   elo: EloSettings;
   play: PlaySettings;
@@ -78,6 +80,7 @@ export interface Tournament {
   clonedFrom: { tournamentId: string; name: string } | null;
   startedAt: number | null;
   finishedAt: number | null;
+  timedMode: TimedModeSettings | null;
 }
 
 export interface Player {
@@ -155,24 +158,6 @@ export const DEFAULT_ELO_SETTINGS: EloSettings = {
 
 export const DEFAULT_PLAY_SETTINGS: PlaySettings = {
   pointsToWin: 21,
-  swissRounds: 5,
   participantLimit: null,
   thirdPlaceMatch: true,
-  grandFinalReset: true,
 };
-
-export const TOURNAMENT_FORMATS: TournamentFormat[] = [
-  'round_robin',
-  'swiss',
-  'single_elim',
-  'double_elim',
-];
-
-/** Elimination formats lock players into fixed teams for the whole bracket. */
-export function isEliminationFormat(format: TournamentFormat | null): boolean {
-  return format === 'single_elim' || format === 'double_elim';
-}
-
-export function teamSize(format: MatchFormat): number {
-  return format === '2v2' ? 2 : 1;
-}

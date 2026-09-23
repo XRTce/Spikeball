@@ -32,7 +32,7 @@ type Scope = 'all' | 'tournament' | 'casual';
 
 const SCOPE_STAGES: Record<Scope, MatchStage[] | undefined> = {
   all: undefined,
-  tournament: ['round_robin', 'swiss', 'winners', 'losers', 'grand_final', 'grand_final_reset', 'third_place'],
+  tournament: ['winners', 'third_place'],
   casual: ['casual'],
 };
 

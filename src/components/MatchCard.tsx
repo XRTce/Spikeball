@@ -25,11 +25,8 @@ export function teamLabel(ids: string[], playerById: Map<string, Player>): strin
 
 function stageLabel(match: Match): string {
   if (match.stage === 'casual') return s.stages.casual;
-  if (match.stage === 'round_robin' || match.stage === 'swiss') {
-    return `${s.common.round} ${match.round}`;
-  }
-  if (match.stage === 'winners' || match.stage === 'losers') {
-    return `${s.stages[match.stage]} · ${matchCode(match.stage, match.round, match.order)}`;
+  if (match.stage === 'winners') {
+    return `${s.stages.winners} · ${matchCode(match.stage, match.round, match.order)}`;
   }
   return s.stages[match.stage];
 }

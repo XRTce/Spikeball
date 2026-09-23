@@ -7,12 +7,12 @@ import {
   clonePlayersFrom,
   createTournament,
   deletePlayer,
-  generateNextSwissRound,
   listMatches,
   listPlayers,
   recordCasualResult,
   setMatchResult,
-  startTournament,
+  startDraftedBracket,
+  startFreePlayTimer,
   updatePlayer,
 } from '../src/db/repo';
 import { exportBackup, importBackup, parseBackup, BackupFormatError } from '../src/db/backup';
@@ -185,79 +185,21 @@ describe('cloning players between tournaments', () => {
   });
 });
 
+/** Groups player ids into fixed 2-player teams, in the order given. */
+function pairsOf(playerIds: string[]): { playerIds: string[] }[] {
+  const teams: { playerIds: string[] }[] = [];
+  for (let i = 0; i + 1 < playerIds.length; i += 2) {
+    teams.push({ playerIds: [playerIds[i]!, playerIds[i + 1]!] });
+  }
+  return teams;
+}
+
 describe('tournament mode', () => {
-  it('generates a full round robin and keeps casual matches', async () => {
-    const { tournamentId, playerIds } = await seedTournament(8);
-    const [a, b, c, d] = playerIds as [string, string, string, string];
-    await recordCasualResult(tournamentId, [a, b], [c, d], 21, 15);
-
-    const result = await startTournament({
-      tournamentId,
-      format: 'round_robin',
-      participantIds: playerIds,
-      seed: 5,
-    });
-    expect(result.matches).toBe(14);
-    expect(result.rounds).toBe(7);
-
-    const matches = await listMatches(tournamentId);
-    expect(matches.filter((match) => match.stage === 'casual')).toHaveLength(1);
-    expect(matches.filter((match) => match.stage === 'round_robin')).toHaveLength(14);
-
-    const tournament = await db.tournaments.get(tournamentId);
-    expect(tournament?.phase).toBe('tournament');
-    expect(tournament?.status).toBe('running');
-  });
-
-  it('only counts the n best players when a smaller field is chosen', async () => {
-    const { tournamentId, playerIds } = await seedTournament(8);
-    const chosen = playerIds.slice(0, 4);
-    await startTournament({ tournamentId, format: 'round_robin', participantIds: chosen, seed: 1 });
-
-    const players = await listPlayers(tournamentId);
-    expect(players.filter((player) => player.inTournament)).toHaveLength(4);
-  });
-
-  it('generates Swiss rounds one at a time', async () => {
-    const { tournamentId, playerIds } = await seedTournament(8);
-    await startTournament({
-      tournamentId,
-      format: 'swiss',
-      participantIds: playerIds,
-      swissRounds: 3,
-    });
-
-    expect(await generateNextSwissRound(tournamentId)).toBe(0); // round 1 still open
-
-    for (const match of (await listMatches(tournamentId)).filter((m) => m.status === 'scheduled')) {
-      await setMatchResult(match.id, 21, 15);
-    }
-    expect(await generateNextSwissRound(tournamentId)).toBe(2);
-
-    const rounds = new Set((await listMatches(tournamentId)).map((match) => match.round));
-    expect(rounds).toEqual(new Set([1, 2]));
-  });
-
-  it('stops generating Swiss rounds at the configured limit', async () => {
-    const { tournamentId, playerIds } = await seedTournament(4);
-    await startTournament({
-      tournamentId,
-      format: 'swiss',
-      participantIds: playerIds,
-      swissRounds: 1,
-    });
-    for (const match of (await listMatches(tournamentId)).filter((m) => m.status === 'scheduled')) {
-      await setMatchResult(match.id, 21, 15);
-    }
-    expect(await generateNextSwissRound(tournamentId)).toBe(0);
-  });
-
   it('plays a single elimination through to a champion', async () => {
     const { tournamentId, playerIds } = await seedTournament(8);
-    await startTournament({
+    await startDraftedBracket({
       tournamentId,
-      format: 'single_elim',
-      participantIds: playerIds,
+      teams: pairsOf(playerIds),
       thirdPlaceMatch: true,
     });
 
@@ -274,58 +216,17 @@ describe('tournament mode', () => {
     }
 
     const matches = await listMatches(tournamentId);
-    const result = bracketResult(matches, 'single_elim');
+    const result = bracketResult(matches);
     expect(result.championIds).not.toBeNull();
     expect(result.complete).toBe(true);
     expect((await db.tournaments.get(tournamentId))?.status).toBe('finished');
-  });
-
-  it('adds and removes the double elimination decider as results change', async () => {
-    const { tournamentId, playerIds } = await seedTournament(8);
-    await startTournament({
-      tournamentId,
-      format: 'double_elim',
-      participantIds: playerIds,
-      grandFinalReset: true,
-    });
-
-    for (let guard = 0; guard < 60; guard += 1) {
-      const open = (await listMatches(tournamentId)).find(
-        (match) =>
-          match.status === 'scheduled' && match.teamA.length > 0 && match.teamB.length > 0,
-      );
-      if (!open) break;
-      await setMatchResult(open.id, 21, 15);
-    }
-
-    const grandFinal = (await listMatches(tournamentId)).find(
-      (match) => match.stage === 'grand_final',
-    )!;
-    expect(grandFinal.status).toBe('done');
-    expect(
-      (await listMatches(tournamentId)).some((match) => match.stage === 'grand_final_reset'),
-    ).toBe(false);
-
-    // The losers bracket finalist wins: a decider appears.
-    await setMatchResult(grandFinal.id, 15, 21);
-    let reset = (await listMatches(tournamentId)).find(
-      (match) => match.stage === 'grand_final_reset',
-    );
-    expect(reset).toBeDefined();
-    expect(reset!.teamA).toHaveLength(2);
-    expect(reset!.teamB).toHaveLength(2);
-
-    // Correcting it back removes the decider again.
-    await setMatchResult(grandFinal.id, 21, 15);
-    reset = (await listMatches(tournamentId)).find((match) => match.stage === 'grand_final_reset');
-    expect(reset).toBeUndefined();
   });
 
   it('returns to the open queue and keeps casual history', async () => {
     const { tournamentId, playerIds } = await seedTournament(8);
     const [a, b, c, d] = playerIds as [string, string, string, string];
     await recordCasualResult(tournamentId, [a, b], [c, d], 21, 15);
-    await startTournament({ tournamentId, format: 'round_robin', participantIds: playerIds, seed: 2 });
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds) });
     await backToCasual(tournamentId);
 
     const tournament = await db.tournaments.get(tournamentId);
@@ -334,6 +235,67 @@ describe('tournament mode', () => {
     const matches = await listMatches(tournamentId);
     expect(matches).toHaveLength(1);
     expect(matches[0]!.stage).toBe('casual');
+  });
+});
+
+describe('timed mode', () => {
+  it('creates a tournament with a timer that has not started yet', async () => {
+    const id = await createTournament({
+      name: 'Sommerfest',
+      timedMode: { freePlayMinutes: 45, draftSize: 8 },
+    });
+    const tournament = await db.tournaments.get(id);
+    expect(tournament?.timedMode).toEqual({
+      freePlayMinutes: 45,
+      draftSize: 8,
+      maxPartnerRepeats: null,
+      timerStartedAt: null,
+    });
+  });
+
+  it('starts the countdown exactly once', async () => {
+    const id = await createTournament({
+      name: 'Sommerfest',
+      timedMode: { freePlayMinutes: 45, draftSize: 8 },
+    });
+    await startFreePlayTimer(id);
+    const startedAt = (await db.tournaments.get(id))?.timedMode?.timerStartedAt;
+    expect(startedAt).not.toBeNull();
+
+    await startFreePlayTimer(id);
+    expect((await db.tournaments.get(id))?.timedMode?.timerStartedAt).toBe(startedAt);
+  });
+
+  it('is a no-op on a tournament without timed mode', async () => {
+    const { tournamentId } = await seedTournament(2);
+    await startFreePlayTimer(tournamentId);
+    expect((await db.tournaments.get(tournamentId))?.timedMode).toBeNull();
+  });
+
+  it('builds a single-elim bracket from captain-drafted teams', async () => {
+    const { tournamentId, playerIds } = await seedTournament(8);
+    const [p1, p2, p3, p4, p5, p6, p7, p8] = playerIds as [
+      string, string, string, string, string, string, string, string,
+    ];
+    // Only 6 of the 8 players get drafted; the rest become spectators.
+    const teams = [
+      { playerIds: [p1, p8] },
+      { playerIds: [p2, p7] },
+      { playerIds: [p3, p6] },
+    ];
+
+    const result = await startDraftedBracket({ tournamentId, teams, thirdPlaceMatch: true });
+    expect(result.unassigned).toEqual([]);
+
+    const tournament = await db.tournaments.get(tournamentId);
+    expect(tournament?.phase).toBe('tournament');
+    expect(tournament?.format).toBe('single_elim');
+    expect(tournament?.bracket?.teams).toHaveLength(3);
+
+    const players = await listPlayers(tournamentId);
+    const byId = new Map(players.map((player) => [player.id, player]));
+    for (const id of [p1, p2, p3, p6, p7, p8]) expect(byId.get(id)!.inTournament).toBe(true);
+    for (const id of [p4, p5]) expect(byId.get(id)!.inTournament).toBe(false);
   });
 });
 
@@ -370,11 +332,12 @@ describe('backup', () => {
 
   it('preserves bracket wiring across an import', async () => {
     const { tournamentId, playerIds } = await seedTournament(8);
-    await startTournament({ tournamentId, format: 'double_elim', participantIds: playerIds });
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds) });
 
-    // Eight players form four doubles teams, so the bracket is 2*(4-1) matches.
+    // Eight players form four doubles teams: 3 bracket matches plus the
+    // default third-place match.
     const imported = await importBackup(parseBackup(JSON.stringify(await exportBackup([tournamentId]))));
-    expect(imported.matches).toBe(6);
+    expect(imported.matches).toBe(4);
 
     const copy = (await db.tournaments.toArray()).find((t) => t.id !== tournamentId)!;
     const matches = await listMatches(copy.id);

@@ -7,10 +7,12 @@ export interface CasualInput {
   ratings: Readonly<Record<string, number>>;
   fallbackRating: number;
   history: PlayHistory;
-  /** 2 for doubles, 1 for singles. */
+  /** Always 2 - team size for the doubles format. */
   teamSize: number;
   /** Seed for tie-breaking, so "shuffle" produces a different-but-fair match. */
   seed?: number;
+  /** Turniermodus only: hard cap on repeated team partnerships; null = unlimited. */
+  maxPartnerRepeats?: number | null;
 }
 
 /**
@@ -44,22 +46,8 @@ export function suggestCasualMatch(input: CasualInput): PlannedMatch | null {
     ratings: input.ratings,
     fallbackRating: input.fallbackRating,
     history: input.history,
+    maxPartnerRepeats: input.maxPartnerRepeats,
   });
 
-  return { round: 1, order: 0, teamA: split.teamA, teamB: split.teamB, bye: false };
-}
-
-/** Forms the fairest teams from an explicitly chosen set of players. */
-export function splitChosenPlayers(
-  players: string[],
-  input: Omit<CasualInput, 'candidates' | 'seed'>,
-): PlannedMatch | null {
-  const needed = input.teamSize * 2;
-  if (players.length !== needed) return null;
-  const split = balancedSplit(players, {
-    ratings: input.ratings,
-    fallbackRating: input.fallbackRating,
-    history: input.history,
-  });
   return { round: 1, order: 0, teamA: split.teamA, teamB: split.teamB, bye: false };
 }

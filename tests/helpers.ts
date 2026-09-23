@@ -124,7 +124,6 @@ export function makeTournament(overrides: Partial<Tournament> = {}): Tournament 
     updatedAt: 0,
     phase: 'casual',
     status: 'open',
-    matchFormat: '2v2',
     format: null,
     elo: { ...DEFAULT_ELO_SETTINGS },
     play: { ...DEFAULT_PLAY_SETTINGS },
@@ -132,6 +131,7 @@ export function makeTournament(overrides: Partial<Tournament> = {}): Tournament 
     clonedFrom: null,
     startedAt: null,
     finishedAt: null,
+    timedMode: null,
     ...overrides,
   };
 }

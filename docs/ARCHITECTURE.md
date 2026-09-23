@@ -76,17 +76,20 @@ view.replay.perMatch    // what each match did to each rating
 view.history            // who partnered/faced whom, for the planner
 ```
 
-## Two phases
+## Two modes, two phases
 
 A tournament starts in `phase: 'casual'` — an open queue where the app suggests
-the next fair match. Switching to `phase: 'tournament'` freezes the current
-ratings, picks the participants and generates a schedule. Casual results are
-kept and keep counting; discarding the tournament (`backToCasual`) removes only
-the generated matches.
+the next fair match (or the organiser assigns teams manually). Whether it ever
+leaves that phase depends on the mode, stored as `tournament.timedMode`:
 
-Elimination formats additionally build fixed teams at that moment and store them
-in `tournament.bracket`, because a knockout needs something stable to eliminate.
-See [ALGORITHMS.md](ALGORITHMS.md).
+- **Liga-Modus** (`timedMode: null`) stays in `phase: 'casual'` forever - a
+  running Elo ladder with no bracket.
+- **Turniermodus** (`timedMode` set) free-plays for a configured duration,
+  then the organiser drafts fixed teams from the best players (see
+  [ALGORITHMS.md](ALGORITHMS.md)) and `phase` switches to `'tournament'`,
+  freezing the current ratings into a single-elimination bracket stored in
+  `tournament.bracket`. Discarding it (`backToCasual`) removes only the
+  generated matches; casual results are kept and keep counting.
 
 ## Storage durability
 
@@ -150,11 +153,12 @@ adding a second file with the same shape and switching the export in
 - **`elo.test.ts`** — expected scores against reference values, symmetry,
   zero-sum behaviour, provisional K, and that replay order does not depend on
   storage order.
-- **`pairing.test.ts`** — the round-robin partner-coverage property (in an
-  8-player field every pair partners exactly once), bye fairness, Swiss
-  partner-repeat avoidance, casual queue fairness.
-- **`elimination.test.ts`** — seeding order, bye propagation through the losers
-  bracket, `2(n-1)` matches for any double-elimination field, decider handling,
-  and that correcting an early result invalidates the right downstream scores.
+- **`pairing.test.ts`** — casual queue fairness, the hard partner-repeat cap,
+  and team balancing.
+- **`draft.test.ts`** — the captain's draft split and turn order.
+- **`elimination.test.ts`** — seeding order, bye propagation, that a
+  third-place match only appears with at least 4 teams, and that correcting an
+  early result invalidates the right downstream scores.
 - **`repo.test.ts`** — the database layer end to end against `fake-indexeddb`,
-  including cloning between tournaments and backup round-trips.
+  including cloning between tournaments, the timed-mode draft bracket, and
+  backup round-trips.

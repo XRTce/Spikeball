@@ -4,6 +4,4 @@ export * from './standings';
 export * from './pairing/utils';
 export * from './pairing/balance';
 export * from './pairing/casual';
-export * from './pairing/roundRobin';
-export * from './pairing/swiss';
 export * from './pairing/elimination';

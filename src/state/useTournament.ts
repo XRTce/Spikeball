@@ -4,13 +4,7 @@ import { db } from '../db/db';
 import { replayElo, type EloReplay } from '../domain/elo';
 import { buildStandings } from '../domain/standings';
 import { buildHistory, type PlayHistory } from '../domain/pairing/utils';
-import {
-  teamSize as teamSizeOf,
-  type Match,
-  type Player,
-  type StandingRow,
-  type Tournament,
-} from '../domain/types';
+import type { Match, Player, StandingRow, Tournament } from '../domain/types';
 
 export interface TournamentView {
   loading: boolean;
@@ -93,7 +87,7 @@ export function useTournament(tournamentId: string | undefined): TournamentView 
         players.map((player) => player.id),
         matches,
       ),
-      teamSize: tournament ? teamSizeOf(tournament.matchFormat) : 2,
+      teamSize: 2,
     };
   }, [data]);
 }
