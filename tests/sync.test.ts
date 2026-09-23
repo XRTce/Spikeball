@@ -516,6 +516,24 @@ describe('joining, leaving and deleting', () => {
     expect(await db.tournaments.get(tournamentId)).toBeUndefined();
   });
 
+  it('deleteTournamentEverywhere treats a tournament the server never got (still revision 0) as already gone', async () => {
+    const { tournamentId } = await seedTournament(1);
+    env.online.value = false;
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId); // offline: the create attempt fails, revision stays 0
+    env.online.value = true;
+
+    expect((await db.sync.get(tournamentId))?.revision).toBe(0);
+    expect(env.server.has(tournamentId)).toBe(false);
+
+    // The server answers 404 for an id it never created; that is deletion
+    // succeeding, not an error - deleting twice (or before the first upload) is fine.
+    await deleteTournamentEverywhere(tournamentId);
+
+    expect(await db.tournaments.get(tournamentId)).toBeUndefined();
+    expect(await db.sync.get(tournamentId)).toBeUndefined();
+  });
+
   it('a remote deletion converts the local copy to local and reports a notice', async () => {
     const { tournamentId } = await seedTournament(1);
     await publishTournament(tournamentId, null);
