@@ -86,11 +86,14 @@ export function CreateTournamentScreen() {
         try {
           // Works offline too - the upload is queued and the share sheet
           // still shows a scannable link, it just says "not uploaded yet".
+          // A SyncError here just means offline/unavailable, which is the
+          // expected queued path, not a failure worth interrupting for.
           await publishTournament(id, password || null);
         } catch (error) {
-          if (!(error instanceof SyncError)) throw error;
-          console.error(error);
-          toast.error(s.errors.generic);
+          if (!(error instanceof SyncError)) {
+            console.error(error);
+            toast.error(s.errors.generic);
+          }
         }
       }
 
