@@ -28,6 +28,8 @@ interface Stored {
   deleted: boolean;
   /** commandId -> revision it was accepted at, for idempotent retries. */
   appliedCommandIds: Map<string, number>;
+  /** Set by tests to make /unlock and push answer 429, as the real rate limiter would. */
+  rateLimited: boolean;
 }
 
 function toProtectionInput(snapshot: TournamentSnapshot): ProtectionInput {
@@ -76,6 +78,8 @@ export interface FakeServer {
   ): number;
   /** Simulates the tournament being deleted by another device or an admin. */
   deleteAsOtherDevice(tournamentId: string): void;
+  /** Makes /unlock and push answer 429 rate_limited (on), or stop doing so (off). */
+  setRateLimited(tournamentId: string, on: boolean): void;
 }
 
 export function createFakeServer(): FakeServer {
@@ -98,6 +102,7 @@ export function createFakeServer(): FakeServer {
       createdAt: body.snapshot.tournament.createdAt,
       deleted: false,
       appliedCommandIds: new Map(),
+      rateLimited: false,
     });
     return respond(201, { revision: 1 });
   }
@@ -113,6 +118,7 @@ export function createFakeServer(): FakeServer {
     const stored = store.get(id);
     if (!stored) return errorResponse('not_found');
     if (stored.deleted) return errorResponse('deleted');
+    if (stored.rateLimited) return errorResponse('rate_limited');
 
     const reasons = protectedChanges(toProtectionInput(stored.snapshot), toProtectionInput(body.snapshot));
     if (stored.passwordHash != null && reasons.length > 0 && password !== stored.passwordHash) {
@@ -135,6 +141,7 @@ export function createFakeServer(): FakeServer {
     const stored = store.get(id);
     if (!stored) return errorResponse('not_found');
     if (stored.deleted) return errorResponse('deleted');
+    if (stored.rateLimited) return errorResponse('rate_limited');
     if (stored.passwordHash != null && body.password !== stored.passwordHash) return errorResponse('locked');
     return respond(204);
   }
@@ -218,6 +225,9 @@ export function createFakeServer(): FakeServer {
     },
     deleteAsOtherDevice(id) {
       requireStored(id).deleted = true;
+    },
+    setRateLimited(id, on) {
+      requireStored(id).rateLimited = on;
     },
   };
 }

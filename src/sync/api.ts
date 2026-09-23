@@ -151,6 +151,12 @@ export async function pushTournament(
     return { kind: 'conflict', revision: result.error.revision ?? 0, applied: result.error.applied ?? [] };
   }
   if (result.error.error === 'locked') return { kind: 'locked', reasons: result.error.reasons ?? [] };
+  // A push the server throttled is a transient condition, not an invalid
+  // change - genericError's 'rejected' would tell the engine (and eventually
+  // the badge) that the change itself was refused, which it wasn't. The
+  // engine already backs off and retries on any thrown SyncError, so this
+  // only needs a code that doesn't claim the push was invalid.
+  if (result.error.error === 'rate_limited') throw new SyncError('unknown', [], result.error.message);
   throw genericError(result.error);
 }
 

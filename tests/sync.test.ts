@@ -194,6 +194,17 @@ describe('the admin password', () => {
     expect((await db.sync.get(tournamentId))?.adminPassword).toBeNull();
   });
 
+  it('unlockTournament throws rejected when the server rate-limits password attempts', async () => {
+    const { tournamentId } = await seedTournament(1);
+    await publishTournament(tournamentId, 'geheim');
+    await syncNow(tournamentId);
+    await lockTournament(tournamentId);
+
+    env.server.setRateLimited(tournamentId, true);
+    await expect(unlockTournament(tournamentId, 'geheim')).rejects.toMatchObject({ code: 'rejected' });
+    expect((await db.sync.get(tournamentId))?.adminPassword).toBeNull();
+  });
+
   it('changeTournamentPassword sets, changes and removes the password', async () => {
     const { tournamentId } = await seedTournament(1);
     await publishTournament(tournamentId, null);
@@ -330,6 +341,40 @@ describe('conflicts and replay', () => {
     expect(sync?.revision).toBe(env.server.getRevision(tournamentId));
     // Discarding resets the local copy to the server's state: the player is back.
     expect(await db.players.get(playerIds[0]!)).toBeDefined();
+  });
+
+  it('a 429-rate-limited push keeps pending, is not reported as "rejected", and drains once the limit clears', async () => {
+    const { tournamentId } = await seedTournament(2);
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    // Go offline first so the command's own auto-triggered sync fails offline
+    // and leaves it queued, rather than racing the rate-limited push below.
+    env.online.value = false;
+    await addPlayer(tournamentId, 'Spieler C');
+    await syncNow(tournamentId);
+    expect((await db.sync.get(tournamentId))?.pending).toHaveLength(1);
+
+    env.online.value = true;
+    env.server.setRateLimited(tournamentId, true);
+    await syncNow(tournamentId);
+
+    let sync = await db.sync.get(tournamentId);
+    expect(sync?.pending).toHaveLength(1); // still queued, nothing was lost
+    // Rate limiting is transient, not the server refusing the change as
+    // invalid - `rejected` would be misleading here.
+    expect(sync?.error).toBe('unknown');
+    expect(sync?.error).not.toBe('rejected');
+
+    // The limit clears; the next attempt (a retry, in the real app driven by
+    // the backoff timer) goes through and drains the queue.
+    env.server.setRateLimited(tournamentId, false);
+    await syncNow(tournamentId);
+
+    sync = await db.sync.get(tournamentId);
+    expect(sync?.pending).toEqual([]);
+    expect(sync?.error).toBeNull();
+    expect(await db.players.where('tournamentId').equals(tournamentId).count()).toBe(3);
   });
 });
 
