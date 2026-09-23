@@ -180,8 +180,18 @@ export const de = {
     draftStart: 'Draft starten',
     draftStartExpired: 'Zeit abgelaufen - Draft starten',
     draftConfirmTitle: 'Bracket erstellen?',
-    draftConfirmText: (n: number) =>
-      `Die ${n} besten Spieler nach Elo spielen ein K.o.-Bracket. Alle anderen werden Zuschauer.`,
+    draftConfirmText: (teams: number, spectators: number, replacesBracket: boolean) =>
+      [
+        `${teams} Teams spielen ein K.o.-Bracket.`,
+        spectators === 0
+          ? 'Alle Spieler sind dabei.'
+          : spectators === 1
+            ? '1 Spieler wird Zuschauer.'
+            : `${spectators} Spieler werden Zuschauer.`,
+        replacesBracket ? 'Das bisherige Bracket und seine Ergebnisse werden gelöscht.' : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
   },
   settings: {
     title: 'Einstellungen',
@@ -251,8 +261,13 @@ export const de = {
     teamsSoFar: 'Bereits gebildete Teams',
     confirmTitle: 'Teams bestätigen',
     bracketCreate: 'Bracket erstellen',
+    bracketCreateConfirm: 'Erstellen',
     created: 'Bracket erstellt',
     tooFewPlayers: 'Zu wenige aktive Spieler für einen Draft.',
+    leaveTitle: 'Draft abbrechen?',
+    leaveText: 'Die bisher gewählten Teams gehen verloren.',
+    leaveConfirm: 'Verwerfen',
+    leaveCancel: 'Weiter draften',
   },
   share: {
     title: 'Turnier teilen',

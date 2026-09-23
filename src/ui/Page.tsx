@@ -9,12 +9,19 @@ export function AppBar({
   title,
   subtitle,
   back,
+  onBack,
   actions,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   /** `true` uses history.back(), a string navigates to that path. */
   back?: boolean | string;
+  /**
+   * Replaces the navigation `back` would do, for a screen that has to ask
+   * before it is left (unsaved input). `back` still decides whether the
+   * button is shown.
+   */
+  onBack?: () => void;
   actions?: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -35,7 +42,11 @@ export function AppBar({
             variant="ghost"
             icon="chevronLeft"
             aria-label="Zurück"
-            onClick={() => (typeof back === 'string' ? navigate(back) : navigate(-1))}
+            onClick={() => {
+              if (onBack) onBack();
+              else if (typeof back === 'string') navigate(back);
+              else navigate(-1);
+            }}
           />
         )}
         <div className={css.titleBlock}>
