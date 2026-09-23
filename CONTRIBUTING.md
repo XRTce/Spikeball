@@ -8,10 +8,12 @@ someone's phone with cold hands".
 
 ```bash
 npm install
-npm run dev
+npm run dev         # the app (Vite, port 5173), proxying /api to dev:server
+npm run dev:server  # the sync server in watch mode (port 8787, data in ./.data)
 ```
 
-Node 20 or newer.
+Node 22.13 or newer &mdash; `server/` uses `node:sqlite`, which needs that
+version to run without an experimental flag.
 
 ## Before you open a pull request
 
