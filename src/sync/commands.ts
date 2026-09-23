@@ -28,6 +28,34 @@ export function getCommandImpl(name: CommandName): AnyFn | undefined {
 }
 
 /**
+ * What row a queued command's first argument refers to, for the small set of
+ * commands whose only job is to act on one existing match or player.
+ *
+ * repo.ts's mutations deliberately tolerate a missing row with a silent
+ * no-op (a stale reference on the same device is usually a harmless race
+ * with a live query re-render), so replaying one of these against a snapshot
+ * where the row is gone would otherwise succeed doing nothing - silently
+ * losing whatever the command was meant to record. The replay step in
+ * engine.ts uses this to recognise that case up front and report it as a
+ * dropped command instead, exactly as docs/SYNC.md describes.
+ */
+const TARGET_TABLE: Partial<Record<CommandName, 'matches' | 'players'>> = {
+  setMatchResult: 'matches',
+  clearMatchResult: 'matches',
+  deleteMatch: 'matches',
+  swapMatchPlayers: 'matches',
+  updatePlayer: 'players',
+  deletePlayer: 'players',
+};
+
+export function commandTarget(name: CommandName, args: unknown[]): { table: 'matches' | 'players'; id: string } | null {
+  const table = TARGET_TABLE[name];
+  if (!table) return null;
+  const id = args[0];
+  return typeof id === 'string' ? { table, id } : null;
+}
+
+/**
  * Public commands run one at a time, so that id recording is unambiguous and
  * a replay never interleaves with a new tap (docs/SYNC.md, "Commands").
  * Local-tournament calls bypass this queue entirely - only a mutation that

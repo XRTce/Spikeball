@@ -8,7 +8,7 @@ import type { StateEvent } from './protocol';
 import { SyncError } from './errors';
 import { getSyncEnv } from './config';
 import * as api from './api';
-import { getCommandImpl } from './commands';
+import { commandTarget, getCommandImpl } from './commands';
 import { readSyncAndSnapshot, writeSnapshotRows } from './snapshot';
 import { emitNotice, setSyncing } from './store';
 
@@ -242,11 +242,20 @@ async function replay(tournamentId: string, applied: string[]): Promise<void> {
         droppedCount += 1;
         continue;
       }
+
+      const target = commandTarget(cmd.name, cmd.args);
+      if (target) {
+        const row = target.table === 'matches' ? await db.matches.get(target.id) : await db.players.get(target.id);
+        if (!row) {
+          droppedCount += 1; // its target is gone in the newer snapshot.
+          continue;
+        }
+      }
+
       try {
         await withIdTape({ mode: 'replay', ids: cmd.ids }, () => impl(...cmd.args));
         surviving.push(cmd);
       } catch {
-        // Its target (a match, a player) is gone in the newer snapshot.
         droppedCount += 1;
       }
     }
