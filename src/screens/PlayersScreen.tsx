@@ -223,7 +223,7 @@ export function PlayersScreen() {
         runGuarded={guard.run}
         onDone={(count) => {
           setCloneOpen(false);
-          toast.success(`${count} ${count === 1 ? 'Spieler' : 'Spieler'} uebernommen`);
+          toast.success(`${count} ${count === 1 ? 'Spieler' : 'Spieler'} übernommen`);
         }}
       />
       {guard.sheet}
@@ -376,7 +376,7 @@ function ClonePlayersSheet({
               value={sourceId}
               onChange={(event) => setSourceId(event.currentTarget.value)}
             >
-              <option value="">Bitte waehlen</option>
+              <option value="">Bitte wählen</option>
               {entries.map(({ tournament, players }) => (
                 <option key={tournament.id} value={tournament.id}>
                   {tournament.name} ({players})
@@ -394,7 +394,7 @@ function ClonePlayersSheet({
             />
             <p className={form.hint}>{s.create.cloneHint}</p>
             <p className={form.hint}>
-              <Icon name="info" size={13} /> Namen, die es hier schon gibt, werden uebersprungen.
+              <Icon name="info" size={13} /> Namen, die es hier schon gibt, werden übersprungen.
             </p>
           </>
         )}

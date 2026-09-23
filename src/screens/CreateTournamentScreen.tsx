@@ -338,7 +338,7 @@ export function CreateTournamentScreen() {
                 </div>
                 <NumberStepper
                   label="Spiele bis etabliert"
-                  hint="Bis dahin gilt der hoehere K-Faktor"
+                  hint="Bis dahin gilt der höhere K-Faktor"
                   value={provisionalMatches}
                   onChange={setProvisionalMatches}
                   min={0}
@@ -346,7 +346,7 @@ export function CreateTournamentScreen() {
                 />
                 <NumberStepper
                   label="Spiel bis"
-                  hint="Zielpunktzahl fuer die Ergebniseingabe"
+                  hint="Zielpunktzahl für die Ergebniseingabe"
                   value={pointsToWin}
                   onChange={setPointsToWin}
                   min={5}
@@ -356,7 +356,7 @@ export function CreateTournamentScreen() {
                   checked={useMov}
                   onChange={setUseMov}
                   label="Deutlichkeit des Siegs einrechnen"
-                  hint="Ein 21:3 zaehlt mehr als ein 21:19."
+                  hint="Ein 21:3 zählt mehr als ein 21:19."
                 />
               </>
             )}

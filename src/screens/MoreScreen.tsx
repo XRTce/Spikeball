@@ -132,7 +132,7 @@ export function MoreScreen() {
                   </Badge>
                 ) : isTournament ? (
                   <Badge tone="brand" icon="bracket">
-                    laeuft
+                    läuft
                   </Badge>
                 ) : null
               }
@@ -148,7 +148,7 @@ export function MoreScreen() {
                       block
                       onClick={() => guard.run(() => reopenTournament(tournament.id))}
                     >
-                      Turnier wieder oeffnen
+                      Turnier wieder öffnen
                     </Button>
                   ) : (
                     <Button
@@ -365,7 +365,7 @@ export function MoreScreen() {
 
           {tournament.clonedFrom && (
             <p className={form.hint}>
-              Spieler uebernommen aus &bdquo;{tournament.clonedFrom.name}&ldquo;.
+              Spieler übernommen aus &bdquo;{tournament.clonedFrom.name}&ldquo;.
             </p>
           )}
         </Stack>

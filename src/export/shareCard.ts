@@ -269,7 +269,7 @@ export function renderShareCard(data: ShareCardData): HTMLCanvasElement {
   canvas.width = W;
   canvas.height = layout.height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D wird nicht unterstuetzt');
+  if (!ctx) throw new Error('Canvas 2D wird nicht unterstützt');
 
   ctx.fillStyle = COLORS.bg;
   ctx.fillRect(0, 0, W, layout.height);

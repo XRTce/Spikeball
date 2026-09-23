@@ -94,7 +94,7 @@ export async function joinTournament(tournamentId: string): Promise<void> {
       await runSyncNow(tournamentId);
       return;
     }
-    throw new SyncError('rejected', [], 'Diese Turnier-Id ist auf diesem Geraet bereits lokal vorhanden');
+    throw new SyncError('rejected', [], 'Diese Turnier-Id ist auf diesem Gerät bereits lokal vorhanden');
   }
 
   const fetched = await api.fetchTournament(tournamentId);
@@ -157,7 +157,7 @@ export async function lockTournament(tournamentId: string): Promise<void> {
  */
 export async function changeTournamentPassword(tournamentId: string, next: string | null): Promise<void> {
   const sync = await db.sync.get(tournamentId);
-  if (!sync) throw new SyncError('rejected', [], 'Kein oeffentliches Turnier');
+  if (!sync) throw new SyncError('rejected', [], 'Kein öffentliches Turnier');
 
   await api.setPassword(tournamentId, sync.adminPassword, next);
 
@@ -189,7 +189,7 @@ export async function leaveTournament(tournamentId: string): Promise<void> {
  */
 export async function deleteTournamentEverywhere(tournamentId: string): Promise<void> {
   const sync = await db.sync.get(tournamentId);
-  if (!sync) throw new SyncError('rejected', [], 'Kein oeffentliches Turnier');
+  if (!sync) throw new SyncError('rejected', [], 'Kein öffentliches Turnier');
 
   await api.deleteTournament(tournamentId, sync.adminPassword);
   await removeLocalCopy(tournamentId);

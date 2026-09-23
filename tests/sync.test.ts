@@ -258,7 +258,7 @@ describe('conflicts and replay', () => {
     const otherPlayer: Player = {
       id: 'other-player',
       tournamentId,
-      name: 'Von anderem Geraet',
+      name: 'Von anderem Gerät',
       baseElo: 1000,
       elo: 1000,
       createdAt: Date.now(),

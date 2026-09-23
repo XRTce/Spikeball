@@ -192,7 +192,7 @@ export function SettingsScreen() {
         onConfirm={async () => {
           setConfirmErase(false);
           await eraseEverything();
-          toast.success('Alle Daten geloescht');
+          toast.success('Alle Daten gelöscht');
         }}
       />
     </Shell>

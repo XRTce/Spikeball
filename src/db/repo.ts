@@ -441,7 +441,7 @@ function planEliminationBracket(
   teams: BracketTeam[],
   thirdPlaceMatch: boolean,
 ): { drafts: BracketMatchDraft[]; bracket: NonNullable<Tournament['bracket']> } {
-  if (teams.length < 2) throw new Error('Zu wenige Teams fuer ein K.o.-Turnier');
+  if (teams.length < 2) throw new Error('Zu wenige Teams für ein K.o.-Turnier');
   const plan = buildSingleElimination(teams, { thirdPlaceMatch, makeId });
   return {
     drafts: plan.matches,
