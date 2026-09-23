@@ -26,6 +26,8 @@ import { strings } from '../i18n';
 import { usePlayerColors } from '../state/playerColors';
 import { useTournamentView } from './TournamentLayout';
 import { useTournamentList } from '../state/useTournament';
+import { useGuardedAction } from '../state/useGuardedAction';
+import { useSyncStatus } from '../sync';
 import { addPlayer, clonePlayersFrom, deletePlayer, updatePlayer } from '../db/repo';
 import type { Player } from '../domain/types';
 import css from './PlayersScreen.module.css';
@@ -40,6 +42,7 @@ export function PlayersScreen() {
   const colors = usePlayerColors();
   const tournament = view.tournament!;
   const allTournaments = useTournamentList() ?? [];
+  const guard = useGuardedAction(tournament.id);
 
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState<Player | null>(null);
@@ -56,10 +59,10 @@ export function PlayersScreen() {
     [newName, view.players],
   );
 
-  const submitNew = async () => {
+  const submitNew = () => {
     const name = newName.trim();
     if (!name || nameTaken) return;
-    await addPlayer(tournament.id, name);
+    guard.run(() => addPlayer(tournament.id, name));
     setNewName('');
   };
 
@@ -90,7 +93,7 @@ export function PlayersScreen() {
               className={css.addRow}
               onSubmit={(event) => {
                 event.preventDefault();
-                void submitNew();
+                submitNew();
               }}
             >
               <TextField
@@ -168,7 +171,7 @@ export function PlayersScreen() {
                         aria-checked={player.active}
                         aria-label={player.active ? s.players.active : s.players.inactive}
                         className={cx(css.toggle, player.active && css.toggleOn)}
-                        onClick={() => void updatePlayer(player.id, { active: !player.active })}
+                        onClick={() => guard.run(() => updatePlayer(player.id, { active: !player.active }))}
                       >
                         <span className={css.knob} />
                       </button>
@@ -192,6 +195,7 @@ export function PlayersScreen() {
 
       <EditPlayerSheet
         player={editing}
+        runGuarded={guard.run}
         onClose={() => setEditing(null)}
         onDelete={(player) => {
           setEditing(null);
@@ -207,7 +211,7 @@ export function PlayersScreen() {
         destructive
         onCancel={() => setConfirmDelete(null)}
         onConfirm={() => {
-          if (confirmDelete) void deletePlayer(confirmDelete.id);
+          if (confirmDelete) guard.run(() => deletePlayer(confirmDelete.id));
           setConfirmDelete(null);
         }}
       />
@@ -216,27 +220,33 @@ export function PlayersScreen() {
         open={cloneOpen}
         onClose={() => setCloneOpen(false)}
         currentId={tournament.id}
+        runGuarded={guard.run}
         onDone={(count) => {
           setCloneOpen(false);
           toast.success(`${count} ${count === 1 ? 'Spieler' : 'Spieler'} uebernommen`);
         }}
       />
+      {guard.sheet}
     </>
   );
 }
 
 function EditPlayerSheet({
   player,
+  runGuarded,
   onClose,
   onDelete,
 }: {
   player: Player | null;
+  runGuarded: (fn: () => unknown) => void;
   onClose: () => void;
   onDelete: (player: Player) => void;
 }) {
   const [name, setName] = useState('');
   const [baseElo, setBaseElo] = useState(1000);
   const [active, setActive] = useState(true);
+  const status = useSyncStatus(player?.tournamentId);
+  const locked = status.isProtected && !status.unlocked;
 
   // Re-seed the form whenever a different player is opened.
   useEffect(() => {
@@ -261,8 +271,10 @@ function EditPlayerSheet({
           <Button
             variant="primary"
             icon="check"
-            onClick={async () => {
-              await updatePlayer(player.id, { name: name.trim() || player.name, baseElo, active });
+            onClick={() => {
+              runGuarded(() =>
+                updatePlayer(player.id, { name: name.trim() || player.name, baseElo, active }),
+              );
               onClose();
             }}
           >
@@ -288,7 +300,12 @@ function EditPlayerSheet({
           step={25}
         />
         <Switch checked={active} onChange={setActive} label={s.players.active} />
-        <Button variant="dangerGhost" icon="trash" onClick={() => onDelete(player)}>
+        <Button
+          variant="dangerGhost"
+          icon="trash"
+          iconAfter={locked ? 'lock' : undefined}
+          onClick={() => onDelete(player)}
+        >
           {s.common.delete}
         </Button>
       </div>
@@ -300,11 +317,13 @@ function ClonePlayersSheet({
   open,
   onClose,
   currentId,
+  runGuarded,
   onDone,
 }: {
   open: boolean;
   onClose: () => void;
   currentId: string;
+  runGuarded: (fn: () => unknown) => void;
   onDone: (count: number) => void;
 }) {
   const entries = (useTournamentList() ?? []).filter(
@@ -329,12 +348,17 @@ function ClonePlayersSheet({
             icon="copy"
             disabled={!sourceId}
             busy={busy}
-            onClick={async () => {
+            onClick={() => {
               if (!sourceId) return;
               setBusy(true);
-              const count = await clonePlayersFrom(currentId, sourceId, ratingSource);
-              setBusy(false);
-              onDone(count);
+              runGuarded(async () => {
+                try {
+                  const count = await clonePlayersFrom(currentId, sourceId, ratingSource);
+                  onDone(count);
+                } finally {
+                  setBusy(false);
+                }
+              });
             }}
           >
             {s.common.add}
