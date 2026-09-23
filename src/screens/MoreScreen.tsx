@@ -404,7 +404,7 @@ export function MoreScreen() {
       <ConfirmDialog
         open={confirmDiscard}
         title={s.more.backToCasualTitle}
-        message={s.more.backToCasualText}
+        message={timedMode ? s.more.backToCasualTimedText : s.more.backToCasualText}
         confirmLabel={s.more.backToCasual}
         destructive
         onCancel={() => setConfirmDiscard(false)}

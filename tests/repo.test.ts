@@ -266,6 +266,46 @@ describe('timed mode', () => {
     expect((await db.tournaments.get(id))?.timedMode?.timerStartedAt).toBe(startedAt);
   });
 
+  it('can run a fresh countdown after the drafted bracket is discarded', async () => {
+    const tournamentId = await createTournament({
+      name: 'Sommerfest',
+      timedMode: { freePlayMinutes: 45, draftSize: 4 },
+    });
+    const playerIds: string[] = [];
+    for (let i = 1; i <= 4; i += 1) playerIds.push(await addPlayer(tournamentId, `Spieler ${i}`));
+
+    await startFreePlayTimer(tournamentId);
+    const firstStart = (await db.tournaments.get(tournamentId))?.timedMode?.timerStartedAt;
+    expect(firstStart).not.toBeNull();
+
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds) });
+    await backToCasual(tournamentId);
+
+    const discarded = await db.tournaments.get(tournamentId);
+    expect(discarded?.phase).toBe('casual');
+    // Back to "not started", with the rest of the Turniermodus config intact.
+    expect(discarded?.timedMode).toEqual({
+      freePlayMinutes: 45,
+      draftSize: 4,
+      maxPartnerRepeats: null,
+      timerStartedAt: null,
+    });
+
+    // Date.now() may not have moved on a fast machine, so only "set again" is checked.
+    await startFreePlayTimer(tournamentId);
+    expect((await db.tournaments.get(tournamentId))?.timedMode?.timerStartedAt).not.toBeNull();
+
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds) });
+    expect((await db.tournaments.get(tournamentId))?.phase).toBe('tournament');
+  });
+
+  it('leaves a Liga tournament without timed mode when its bracket is discarded', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds) });
+    await backToCasual(tournamentId);
+    expect((await db.tournaments.get(tournamentId))?.timedMode).toBeNull();
+  });
+
   it('is a no-op on a tournament without timed mode', async () => {
     const { tournamentId } = await seedTournament(2);
     await startFreePlayTimer(tournamentId);

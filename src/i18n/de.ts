@@ -166,6 +166,8 @@ export const de = {
     backToCasualTitle: 'Turnier verwerfen?',
     backToCasualText:
       'Der Spielplan und alle Turnierergebnisse werden gelöscht. Freie Spiele bleiben erhalten.',
+    backToCasualTimedText:
+      'Der Spielplan und alle Turnierergebnisse werden gelöscht, das Zeitlimit wird zurückgesetzt. Freie Spiele bleiben erhalten.',
     export: 'Ergebnisbild teilen',
     exportHint: 'Podium, Elo-Verlauf und Bilanz als Bild',
     rename: 'Turnier umbenennen',
