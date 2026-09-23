@@ -1,5 +1,6 @@
 import { db, makeId } from './db';
 import type { Match, Player, Tournament } from '../domain/types';
+import { normalizeMatch, normalizePlayer, normalizeTournament } from './normalize';
 
 export const BACKUP_FORMAT = 'rally-backup';
 export const BACKUP_VERSION = 1;
@@ -98,49 +99,70 @@ export async function importBackup(file: BackupFile): Promise<ImportResult> {
 
   const now = Date.now();
 
-  const tournaments: Tournament[] = file.tournaments.map((tournament) => ({
-    ...tournament,
-    id: tournamentIds.get(tournament.id)!,
-    updatedAt: now,
-    // Remapped ids make every import a new tournament that no server knows,
-    // and backups written before sync existed carry no visibility at all.
-    visibility: 'local',
-    clonedFrom: tournament.clonedFrom
-      ? {
-          ...tournament.clonedFrom,
-          tournamentId:
-            tournamentIds.get(tournament.clonedFrom.tournamentId) ??
-            tournament.clonedFrom.tournamentId,
-        }
-      : null,
-    bracket: tournament.bracket
-      ? {
-          ...tournament.bracket,
-          teams: tournament.bracket.teams.map((team) => ({
-            ...team,
-            id: makeId(),
-            playerIds: remapPlayers(team.playerIds),
-          })),
-        }
-      : null,
-  }));
+  // An old backup can carry formats, stages and fields this build no longer
+  // has; it goes through the same rules as the Dexie v3 upgrade (see
+  // normalize.ts) before ids are remapped, so "reverted" is keyed by the
+  // file's own ids.
+  const reverted = new Set<string>();
+  const tournaments: Tournament[] = file.tournaments.map((original) => {
+    const normalized = normalizeTournament(original as unknown as Record<string, unknown>);
+    if (normalized.reverted) reverted.add(original.id);
+    const tournament = normalized.tournament;
+    return {
+      ...tournament,
+      id: tournamentIds.get(original.id)!,
+      updatedAt: now,
+      // Remapped ids make every import a new tournament that no server
+      // knows, and backups written before sync existed carry no visibility
+      // at all.
+      visibility: 'local',
+      clonedFrom: tournament.clonedFrom
+        ? {
+            ...tournament.clonedFrom,
+            tournamentId:
+              tournamentIds.get(tournament.clonedFrom.tournamentId) ??
+              tournament.clonedFrom.tournamentId,
+          }
+        : null,
+      bracket: tournament.bracket
+        ? {
+            ...tournament.bracket,
+            teams: tournament.bracket.teams.map((team) => ({
+              ...team,
+              id: makeId(),
+              playerIds: remapPlayers(team.playerIds),
+            })),
+          }
+        : null,
+    };
+  });
 
   const players: Player[] = file.players
     .filter((player) => tournamentIds.has(player.tournamentId))
-    .map((player) => ({
-      ...player,
-      id: playerIds.get(player.id)!,
-      tournamentId: tournamentIds.get(player.tournamentId)!,
-      // The origin points at a tournament that may not be part of this file.
-      origin: null,
-    }));
+    .map((original) => {
+      const player = normalizePlayer(original as unknown as Record<string, unknown>, {
+        tournamentReverted: reverted.has(original.tournamentId),
+      });
+      return {
+        ...player,
+        id: playerIds.get(original.id)!,
+        tournamentId: tournamentIds.get(original.tournamentId)!,
+        // The origin points at a tournament that may not be part of this file.
+        origin: null,
+      };
+    });
 
-  const matches: Match[] = file.matches
-    .filter((match) => tournamentIds.has(match.tournamentId))
-    .map((match) => ({
+  const matches: Match[] = [];
+  for (const original of file.matches) {
+    if (!tournamentIds.has(original.tournamentId)) continue;
+    const match = normalizeMatch(original as unknown as Record<string, unknown>, {
+      tournamentReverted: reverted.has(original.tournamentId),
+    });
+    if (!match) continue;
+    matches.push({
       ...match,
-      id: matchIds.get(match.id)!,
-      tournamentId: tournamentIds.get(match.tournamentId)!,
+      id: matchIds.get(original.id)!,
+      tournamentId: tournamentIds.get(original.tournamentId)!,
       teamA: remapPlayers(match.teamA),
       teamB: remapPlayers(match.teamB),
       feedsWinnerTo: match.feedsWinnerTo
@@ -149,7 +171,8 @@ export async function importBackup(file: BackupFile): Promise<ImportResult> {
       feedsLoserTo: match.feedsLoserTo
         ? { ...match.feedsLoserTo, matchId: matchIds.get(match.feedsLoserTo.matchId)! }
         : null,
-    }));
+    });
+  }
 
   await db.transaction('rw', db.tournaments, db.players, db.matches, async () => {
     await db.tournaments.bulkAdd(tournaments);
