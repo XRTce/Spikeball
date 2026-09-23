@@ -49,6 +49,17 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  server: {
+    proxy: {
+      // The API is same-origin in production (one Node process serves both);
+      // in dev the app and the sync server run as separate processes, so this
+      // proxy makes them look same-origin too. `ws: true` alone is not enough
+      // for SSE (it is plain HTTP, not a WebSocket upgrade) - Vite's proxy
+      // streams normal responses through unbuffered by default, which is all
+      // an EventSource connection needs.
+      '/api': { target: 'http://localhost:8787', changeOrigin: true },
+    },
+  },
   build: {
     target: 'es2020',
     cssCodeSplit: false,
@@ -76,6 +87,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         globIgnores: ['**/404.html'],
         navigateFallback: withBase('index.html'),
+        // Public-tournament requests hit /api/*; the service worker must let
+        // those reach the network and never answer them with the app shell.
+        navigateFallbackDenylist: [/\/api\//],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
       },

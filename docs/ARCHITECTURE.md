@@ -1,8 +1,10 @@
 # Architecture
 
-Rally is a static bundle with no backend. The whole app is a local database
-with a UI on top, so most of the design follows from one decision: **derived
-state is never stored.**
+Rally's app is a local database with a UI on top, so most of the design
+follows from one decision: **derived state is never stored.** A tournament can
+optionally be mirrored on a small sync server (see [SYNC.md](SYNC.md)), but
+the UI still only ever reads IndexedDB - the server is a peer of the local
+copy, not a backend the app depends on.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -13,9 +15,12 @@ state is never stored.**
 │  state/         read model, theme, player colours        │
 ├──────────────────────────────────────────────────────────┤
 │  db/            Dexie repository  ← the only mutations   │
+│  sync/          wire protocol + push/pull loop (SYNC.md) │
 ├──────────────────────────────────────────────────────────┤
 │  domain/        pure functions: Elo, pairing, standings  │
 └──────────────────────────────────────────────────────────┘
+
+server/            sync server: SQLite, HTTP, no tournament logic
 ```
 
 `domain/` has no imports from anything above it. It is plain TypeScript over
@@ -123,16 +128,25 @@ removes an entire class of layout shift.
 
 ## Deployment targets
 
-The same source builds for two places, which differ in one thing: where the app
-lives on the host.
+The same source builds for two places, which differ in where the app lives on
+the host and whether a sync server is available at all.
 
-| | Docker / nginx | GitHub Pages |
+| | Docker / Node | GitHub Pages |
 |---|---|---|
 | Served from | `/` | `/Spikeball/` |
-| Deep links | nginx `try_files` rewrite | `404.html` copy of the shell |
-| Headers | cache policy + self-only CSP | whatever Pages sends |
+| Deep links | server-side SPA fallback (`server/static.ts`) | `404.html` copy of the shell |
+| Headers | cache policy + self-only CSP, ported from the old nginx config | whatever Pages sends |
+| Sync server | same process, same origin, port 8080 | none - `useServerAvailable()` is false, so only local tournaments are offered |
 
-`BASE_PATH` at build time is the single input. `vite.config.ts` derives the
+The Docker image runs one Node process (`server/main.ts`, built to
+`dist-server/server.mjs`) that serves the built PWA from `dist/` and the sync
+API from the same port, backed by one SQLite file in the `/data` volume. See
+[SYNC.md](SYNC.md#deployment) for the environment variables. Pointing a
+Pages build at a sync server hosted elsewhere is `VITE_SYNC_URL` at build
+time; that server then needs `RALLY_CORS_ORIGIN` set to the Pages origin.
+
+`BASE_PATH` at build time is the single input for where the app itself lives.
+`vite.config.ts` derives the
 asset prefix, the manifest's `start_url`/`scope`/icon paths and the service
 worker's navigation fallback from it, and `main.tsx` derives the router
 basename from `import.meta.env.BASE_URL`. The trailing slash is stripped there:
@@ -162,3 +176,6 @@ adding a second file with the same shape and switching the export in
 - **`repo.test.ts`** — the database layer end to end against `fake-indexeddb`,
   including cloning between tournaments, the timed-mode draft bracket, and
   backup round-trips.
+- **`server.test.ts`** — the sync server end to end over real HTTP, against an
+  in-memory SQLite database: every endpoint, the compare-and-swap push with
+  idempotent retry, the password lock, SSE, static file serving and CORS.

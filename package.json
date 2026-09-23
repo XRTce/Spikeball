@@ -10,7 +10,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:server": "PORT=8787 RALLY_DATA_DIR=.data NODE_OPTIONS=--disable-warning=ExperimentalWarning vite-node --watch server/main.ts",
+    "build": "tsc -b && vite build && npm run build:server",
+    "build:server": "esbuild server/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist-server/server.mjs",
+    "start": "node --disable-warning=ExperimentalWarning dist-server/server.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
