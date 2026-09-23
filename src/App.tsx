@@ -10,20 +10,11 @@ import { MoreScreen } from './screens/MoreScreen';
 import { PlayerDetailScreen } from './screens/PlayerDetailScreen';
 import { ExportScreen } from './screens/ExportScreen';
 import { DraftScreen } from './screens/DraftScreen';
-import { useEffect } from 'react';
 import { NotFoundScreen } from './screens/NotFoundScreen';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { SyncNotices } from './components/SyncNotices';
-import { startSyncEngine } from './sync';
 
 export function App() {
-  // Flushes queued changes for public tournaments on connectivity/visibility
-  // changes and on a timer; a no-op while nothing is public yet. Started here
-  // rather than main.tsx, which the sync engine itself owns.
-  useEffect(() => {
-    startSyncEngine();
-  }, []);
-
   return (
     <>
       <UpdatePrompt />
