@@ -35,7 +35,9 @@ aufs Handy und kann Ergebnisse eintragen. Mehr dazu in
 | **Elo pro Turnier** | Jeder Spieler hat eine Start-Elo, die sich mit jedem Ergebnis fortschreibt. Wertungen gehoeren zum Turnier, nicht global. |
 | **Spieler uebernehmen** | Ein neues Turnier kann die Spielerliste eines alten klonen &mdash; mit der aktuellen oder der urspruenglichen Wertung als neue Start-Elo. |
 | **Ergebnisbild** | Podium, Elo-Verlauf und Siegbilanz als PNG zum Teilen. |
-| **Offline** | Nach dem ersten Laden laeuft alles ohne Netz. Auf der Wiese hinterm Haus gibt es meist keins. |
+| **Oeffentliche Turniere** | Beim Anlegen *Oeffentlich* waehlen, QR-Code zeigen, fertig: Wer ihn scannt, hat das Turnier live auf dem eigenen Handy und kann Ergebnisse eintragen, Spiele ansetzen und Spieler hinzufuegen. Kein Account, der Link ist der Schluessel. |
+| **Admin-Passwort** | Optional pro oeffentlichem Turnier. Es sperrt alles Zerstoererische: Spieler oder gespielte Ergebnisse loeschen, Regeln und Start-Elo aendern, Timer und K.o. starten oder verwerfen, das Turnier beenden oder fuer alle loeschen. Ergebnisse eintragen bleibt fuer alle offen. |
+| **Offline** | Nach dem ersten Laden laeuft alles ohne Netz. Auf der Wiese hinterm Haus gibt es meist keins. Aenderungen an oeffentlichen Turnieren werden gesammelt und hochgeladen, sobald wieder Netz da ist. |
 
 ## Loslegen
 
@@ -135,6 +137,11 @@ Relevante Umgebungsvariablen (siehe auch [`docs/SYNC.md`](docs/SYNC.md)):
 4. **Im Turniermodus:** Zeitlimit starten, wenn alle da sind. Danach draften
    die besten Spieler feste Teams fuers K.o.-Bracket.
 5. **Ergebnisbild teilen**, wenn alles durch ist.
+
+Mit mehreren Handys: beim Anlegen *Oeffentlich* waehlen (und optional ein
+Admin-Passwort setzen). Den QR-Code zeigt die App direkt danach, spaeter unter
+*Mehr &rarr; QR-Code zeigen*. Die anderen scannen ihn mit der Kamera. Wer das
+Passwort kennt, entsperrt sein Handy einmal unter *Mehr*.
 
 ## Projektstruktur
 

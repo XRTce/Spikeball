@@ -11,6 +11,11 @@ services:
       - "${RALLY_PORT:-8080}:8080"
     volumes:
       - rally-data:/data
+    # Optional sync settings, read from .env (see .env.example).
+    environment:
+      RALLY_CORS_ORIGIN: ${RALLY_CORS_ORIGIN:-}
+      RALLY_RETENTION_DAYS: ${RALLY_RETENTION_DAYS:-365}
+      RALLY_TRUST_PROXY: ${RALLY_TRUST_PROXY:-}
     read_only: true
     tmpfs:
       # Node needs somewhere to write if it ever does (e.g. os.tmpdir()).
