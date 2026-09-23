@@ -195,6 +195,7 @@ export const de = {
     statusRunning: 'läuft',
     tournamentSection: 'Turnier',
     reopen: 'Turnier wieder öffnen',
+    clonedFrom: (name: string) => `Spieler übernommen aus „${name}“.`,
     backToCasual: 'Turnier verwerfen',
     backToCasualTitle: 'Turnier verwerfen?',
     backToCasualText:

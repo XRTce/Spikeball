@@ -365,7 +365,7 @@ export function MoreScreen() {
 
           {tournament.clonedFrom && (
             <p className={form.hint}>
-              Spieler übernommen aus &bdquo;{tournament.clonedFrom.name}&ldquo;.
+              {s.more.clonedFrom(tournament.clonedFrom.name)}
             </p>
           )}
         </Stack>
