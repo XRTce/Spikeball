@@ -57,9 +57,8 @@ Replaying is one code path that is correct by construction:
 // src/db/repo.ts
 export async function recalculate(tournamentId: string) {
   //  1. re-derive bracket progression from the recorded results
-  //  2. add or remove the double-elimination decider as needed
-  //  3. replay every rating from the base ratings
-  //  4. write back only what actually changed
+  //  2. replay every rating from the base ratings
+  //  3. write back only what actually changed
 }
 ```
 
@@ -120,8 +119,8 @@ identical everywhere and never half-rendered.
 **Brackets are shown as rounds, not as a drawn tree.** On a phone a round list
 is readable without pinch-zooming, and every undecided slot names its source
 ("Sieger WB1.2"), so where a team comes from stays explicit. A drawn tree would
-need connector lines whose geometry breaks down in the losers bracket, which is
-exactly where a rendering bug would be least noticeable and most confusing.
+need connector lines whose geometry is easy to get subtly wrong, and would add
+nothing the slot labels do not already say.
 
 **No web fonts.** The system stack renders instantly, matches the platform and
 removes an entire class of layout shift.
