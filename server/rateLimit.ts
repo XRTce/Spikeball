@@ -38,18 +38,20 @@ export class RateLimiter {
   recordFailure(key: string): void {
     const now = this.now();
     const entry = this.attempts.get(key);
-    if (!entry || now - entry.windowStart >= this.windowMs) {
-      if (!this.attempts.has(key) && this.attempts.size >= this.maxKeys) {
-        // Map iteration order is insertion order, and every existing key was
-        // (re)inserted the last time its window opened, so the first key
-        // here is the one that has gone longest without a fresh attempt.
-        const oldestKey = this.attempts.keys().next().value;
-        if (oldestKey !== undefined) this.attempts.delete(oldestKey);
-      }
-      this.attempts.set(key, { count: 1, windowStart: now });
+    if (entry && now - entry.windowStart < this.windowMs) {
+      entry.count += 1;
       return;
     }
-    entry.count += 1;
+    // Map iteration order is insertion order, so deleting before re-setting
+    // moves this key to the end even when it already existed; that keeps
+    // the map ordered by recency, and the first key below is the least
+    // recently active one.
+    this.attempts.delete(key);
+    if (this.attempts.size >= this.maxKeys) {
+      const oldestKey = this.attempts.keys().next().value;
+      if (oldestKey !== undefined) this.attempts.delete(oldestKey);
+    }
+    this.attempts.set(key, { count: 1, windowStart: now });
   }
 
   /** Successful verification clears the key's history, so occasional typos don't add up. */

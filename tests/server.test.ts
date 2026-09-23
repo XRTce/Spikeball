@@ -739,4 +739,32 @@ describe('RateLimiter maxKeys', () => {
     for (let i = 0; i < 9; i += 1) limiter.recordFailure('d');
     expect(limiter.isBlocked('d')).toBe(true);
   });
+
+  it('evicts by recency, not by original insertion order', () => {
+    let now = 0;
+    const windowMs = 100;
+    const limiter = new RateLimiter(2, windowMs, () => now, 3);
+
+    limiter.recordFailure('a'); // inserted first
+    now += 1;
+    limiter.recordFailure('b');
+    limiter.recordFailure('b'); // 2 failures: blocked
+    now += 1;
+    limiter.recordFailure('c');
+    expect(limiter.isBlocked('b')).toBe(true);
+
+    // 'a's window expires; failing again reopens it and must move it to the
+    // back of the eviction order, even though it was inserted before 'b'.
+    now += windowMs;
+    limiter.recordFailure('a');
+
+    // A 4th distinct key must now evict 'b' (least recently active), not
+    // 'a' (just refreshed) - which is what a plain re-`set` on an existing
+    // key would get wrong, since Map keeps an existing key's position.
+    limiter.recordFailure('d');
+
+    expect(limiter.isBlocked('b')).toBe(false); // evicted: history is gone
+    limiter.recordFailure('a'); // 'a' survived with its reopened window intact
+    expect(limiter.isBlocked('a')).toBe(true); // 2 failures since the reopen
+  });
 });
