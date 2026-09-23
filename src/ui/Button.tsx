@@ -29,7 +29,8 @@ export function Button({
   disabled,
   ...rest
 }: ButtonProps) {
-  const iconOnly = children === undefined || children === null || children === '';
+  const hasLabel = children != null && children !== false && children !== '';
+  const iconOnly = !hasLabel;
   const iconSize = size === 'sm' ? 18 : size === 'lg' ? 24 : 20;
 
   const classes = cx(
@@ -47,7 +48,7 @@ export function Button({
         {icon && <Icon name={icon} size={iconSize} />}
         {/* text-overflow only works on a block container holding the text, not
             on the flex container around it, so the text needs its own box. */}
-        {!iconOnly && children !== false && <span className={css.text}>{children}</span>}
+        {hasLabel && <span className={css.text}>{children}</span>}
         {iconAfter && <Icon name={iconAfter} size={iconSize} />}
       </span>
       {busy && (
