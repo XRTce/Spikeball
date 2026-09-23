@@ -66,11 +66,34 @@ jobs:
         run: |
           docker run -d --name rally -p 8080:8080 rally-roundnet:ci
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then break; fi
+            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null; then break; fi
             sleep 1
           done
+          curl -fsS http://127.0.0.1:8080/api/health | grep -q '"ok":true'
           curl -fsS http://127.0.0.1:8080/ | grep -q "Rally"
           curl -fsS http://127.0.0.1:8080/manifest.webmanifest >/dev/null
           # SPA fallback must serve the shell for unknown routes.
           curl -fsS http://127.0.0.1:8080/t/does-not-exist | grep -q "<div id=\"root\">"
+          # index.html and the service worker must never be served stale.
+          curl -fsSI http://127.0.0.1:8080/sw.js | grep -qi "^cache-control: no-cache"
+
+          # A public tournament round-trips through the API the same way the app does.
+          id=$(node -e "console.log(crypto.randomUUID())")
+          tournament=$(node -e "
+            const id = process.argv[1];
+            console.log(JSON.stringify({
+              id, name: 'CI', note: '', createdAt: 1, updatedAt: 1, phase: 'casual', status: 'open', format: null,
+              elo: { baseElo: 1000, kFactor: 24, kFactorProvisional: 40, provisionalMatches: 8, useMarginOfVictory: true },
+              play: { pointsToWin: 21, participantLimit: null, thirdPlaceMatch: true },
+              bracket: null, clonedFrom: null, startedAt: null, finishedAt: null, timedMode: null, visibility: 'local',
+            }));
+          " "$id")
+          body=$(node -e "
+            const tournament = JSON.parse(process.argv[1]);
+            console.log(JSON.stringify({ snapshot: { tournament, players: [], matches: [] }, password: null }));
+          " "$tournament")
+          curl -fsS -X POST http://127.0.0.1:8080/api/tournaments \
+            -H 'Content-Type: application/json' -d "$body" | grep -q '"revision":1'
+          curl -fsS "http://127.0.0.1:8080/api/tournaments/$id" | grep -q "\"id\":\"$id\""
+
           docker rm -f rally
