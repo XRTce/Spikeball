@@ -14,6 +14,7 @@ import { usePlayerColors } from '../state/playerColors';
 import { strings, formatRelative } from '../i18n';
 import { matchWinProbability } from '../domain/elo';
 import { matchCode } from '../domain/pairing/elimination';
+import { useSyncStatus } from '../sync';
 import type { Match, Player, PlaySettings } from '../domain/types';
 import css from './MatchCard.module.css';
 
@@ -224,6 +225,8 @@ export function ResultSheet({
   onDelete,
 }: ResultSheetProps) {
   const colors = usePlayerColors();
+  const status = useSyncStatus(match?.tournamentId);
+  const locked = status.isProtected && !status.unlocked;
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
 
@@ -333,7 +336,13 @@ export function ResultSheet({
         {(onClear || onDelete) && match.status === 'done' && (
           <div className={css.sheetActions}>
             {onClear && (
-              <Button size="sm" variant="ghost" icon="undo" onClick={() => onClear(match.id)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="undo"
+                iconAfter={locked ? 'lock' : undefined}
+                onClick={() => onClear(match.id)}
+              >
                 {s.play.reopen}
               </Button>
             )}
@@ -342,6 +351,7 @@ export function ResultSheet({
                 size="sm"
                 variant="dangerGhost"
                 icon="trash"
+                iconAfter={locked ? 'lock' : undefined}
                 onClick={() => onDelete(match.id)}
               >
                 {s.play.deleteMatch}

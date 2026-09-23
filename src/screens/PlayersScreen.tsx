@@ -20,6 +20,7 @@ import {
   useToast,
 } from '../ui';
 import { OptionList } from '../components/OptionList';
+import { SyncBadge } from '../components/SyncBadge';
 import { cx } from '../lib/cx';
 import { strings } from '../i18n';
 import { usePlayerColors } from '../state/playerColors';
@@ -69,14 +70,17 @@ export function PlayersScreen() {
         subtitle={tournament.name}
         back={`/t/${tournament.id}`}
         actions={
-          allTournaments.length > 1 ? (
-            <Button
-              variant="ghost"
-              icon="copy"
-              aria-label={s.players.clone}
-              onClick={() => setCloneOpen(true)}
-            />
-          ) : null
+          <>
+            {allTournaments.length > 1 && (
+              <Button
+                variant="ghost"
+                icon="copy"
+                aria-label={s.players.clone}
+                onClick={() => setCloneOpen(true)}
+              />
+            )}
+            <SyncBadge tournamentId={tournament.id} />
+          </>
         }
       />
       <Screen withTabbar>

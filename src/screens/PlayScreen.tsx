@@ -15,6 +15,7 @@ import {
 import { MatchCard, ResultSheet, teamLabel } from '../components/MatchCard';
 import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
 import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
+import { SyncBadge } from '../components/SyncBadge';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import { groupRounds, scheduleProgress } from '../domain/schedule';
@@ -29,6 +30,7 @@ import {
   setMatchResult,
 } from '../db/repo';
 import { useTimedModeCountdown } from '../state/timedMode';
+import { useGuardedAction } from '../state/useGuardedAction';
 import type { Match, Player } from '../domain/types';
 import css from './PlayScreen.module.css';
 
@@ -38,6 +40,7 @@ export function PlayScreen() {
   const view = useTournamentView();
   const toast = useToast();
   const tournament = view.tournament!;
+  const guard = useGuardedAction(tournament.id);
 
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -48,34 +51,35 @@ export function PlayScreen() {
 
   const isTournament = tournament.phase === 'tournament';
 
-  const submitResult = async (matchId: string, scoreA: number, scoreB: number) => {
-    await setMatchResult(matchId, scoreA, scoreB);
-    setResultMatch(null);
-  };
-
   const resultSheet = (
     <ResultSheet
       match={resultMatch}
       playerById={view.playerById}
       play={tournament.play}
       onClose={() => setResultMatch(null)}
-      onSubmit={(matchId, a, b) => void submitResult(matchId, a, b)}
-      onClear={(matchId) => {
-        void clearMatchResult(matchId);
-        setResultMatch(null);
-      }}
-      onDelete={(matchId) => {
-        void deleteMatch(matchId);
-        setResultMatch(null);
-      }}
+      onSubmit={(matchId, a, b) =>
+        guard.run(() => setMatchResult(matchId, a, b).then(() => setResultMatch(null)))
+      }
+      onClear={(matchId) =>
+        guard.run(() => clearMatchResult(matchId).then(() => setResultMatch(null)))
+      }
+      onDelete={(matchId) =>
+        guard.run(() => deleteMatch(matchId).then(() => setResultMatch(null)))
+      }
     />
   );
 
   if (isTournament) {
     return (
       <>
-        <TournamentPlay activeRound={activeRound} setActiveRound={setActiveRound} onEnterResult={setResultMatch} />
+        <TournamentPlay
+          activeRound={activeRound}
+          setActiveRound={setActiveRound}
+          onEnterResult={setResultMatch}
+          runGuarded={guard.run}
+        />
         {resultSheet}
+        {guard.sheet}
       </>
     );
   }
@@ -94,19 +98,23 @@ export function PlayScreen() {
         onEnterResult={setResultMatch}
         onOpenPicker={() => setPickerOpen(true)}
         onOpenAvailability={() => setAvailabilityOpen(true)}
+        runGuarded={guard.run}
       />
       {resultSheet}
+      {guard.sheet}
       <PlayerPickerSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         players={eligiblePlayers}
         ratings={view.ratings}
         teamSize={view.teamSize}
-        onConfirm={async (teamA, teamB) => {
-          await scheduleCasualMatch(tournament.id, teamA, teamB);
-          setPickerOpen(false);
-          toast.success('Spiel steht auf dem Platz');
-        }}
+        onConfirm={(teamA, teamB) =>
+          guard.run(async () => {
+            await scheduleCasualMatch(tournament.id, teamA, teamB);
+            setPickerOpen(false);
+            toast.success('Spiel steht auf dem Platz');
+          })
+        }
       />
       <AvailablePlayersSheet
         open={availabilityOpen}
@@ -135,6 +143,7 @@ function CasualPlay({
   onEnterResult,
   onOpenPicker,
   onOpenAvailability,
+  runGuarded,
 }: {
   seed: number;
   eligiblePlayers: Player[];
@@ -143,6 +152,7 @@ function CasualPlay({
   onEnterResult: (match: Match) => void;
   onOpenPicker: () => void;
   onOpenAvailability: () => void;
+  runGuarded: (fn: () => unknown) => void;
 }) {
   const view = useTournamentView();
   const tournament = view.tournament!;
@@ -201,6 +211,7 @@ function CasualPlay({
         title={tournament.name}
         subtitle={s.play.casualTitle}
         back="/"
+        actions={<SyncBadge tournamentId={tournament.id} />}
       />
       <Screen withTabbar>
         <Stack>
@@ -277,10 +288,8 @@ function CasualPlay({
                   icon="play"
                   block
                   onClick={() =>
-                    void scheduleCasualMatch(
-                      tournament.id,
-                      suggestion.teamA,
-                      suggestion.teamB,
+                    runGuarded(() =>
+                      scheduleCasualMatch(tournament.id, suggestion.teamA, suggestion.teamB),
                     )
                   }
                 >
@@ -353,10 +362,12 @@ function TournamentPlay({
   activeRound,
   setActiveRound,
   onEnterResult,
+  runGuarded,
 }: {
   activeRound: string | null;
   setActiveRound: (key: string) => void;
   onEnterResult: (match: Match) => void;
+  runGuarded: (fn: () => unknown) => void;
 }) {
   const view = useTournamentView();
   const tournament = view.tournament!;
@@ -388,6 +399,7 @@ function TournamentPlay({
         title={tournament.name}
         subtitle={tournament.format ? s.formats[tournament.format] : s.play.tournamentTitle}
         back="/"
+        actions={<SyncBadge tournamentId={tournament.id} />}
       />
       <Screen withTabbar>
         <Stack>
@@ -450,7 +462,7 @@ function TournamentPlay({
               size="lg"
               icon="trophy"
               block
-              onClick={() => void finishTournament(tournament.id)}
+              onClick={() => runGuarded(() => finishTournament(tournament.id))}
             >
               {s.play.finish}
             </Button>
