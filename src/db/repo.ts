@@ -413,8 +413,6 @@ export const swapMatchPlayers = command('swapMatchPlayers', matchTournamentId, s
 export interface StartTournamentResult {
   matches: number;
   rounds: number;
-  /** Players that could not be placed in a team (odd field in an elimination). */
-  unassigned: string[];
 }
 
 /** Turns a bracket plan's match drafts into storable matches. */
@@ -515,17 +513,12 @@ async function startDraftedBracketImpl(
       startedAt: Date.now(),
       finishedAt: null,
       updatedAt: Date.now(),
-      play: {
-        ...tournament.play,
-        participantLimit: drafted.size,
-        thirdPlaceMatch,
-      },
+      play: { ...tournament.play, thirdPlaceMatch },
     });
 
     return {
       matches: created.filter((match) => !match.bye).length,
       rounds: new Set(created.map((match) => match.round)).size,
-      unassigned: [] as string[],
     };
   });
 

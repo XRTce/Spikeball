@@ -55,49 +55,9 @@ export function seedOrder(size: number): number[] {
   return seeds;
 }
 
-export interface BuildTeamsInput {
-  playerIds: string[];
-  ratings: Readonly<Record<string, number>>;
-  fallbackRating: number;
-  nameOf: (playerId: string) => string;
-  makeId: () => string;
-}
-
 /**
- * Turns the participant list into the fixed teams that contest an elimination
- * bracket, by snake pairing - highest rated with lowest rated, and so on
- * inwards - the standard way to produce evenly matched pairs from a ranked
- * pool. Teams are then seeded by their combined rating.
- */
-export function buildBracketTeams(input: BuildTeamsInput): {
-  teams: BracketTeam[];
-  unassigned: string[];
-} {
-  const rating = (id: string) => input.ratings[id] ?? input.fallbackRating;
-  const ranked = [...input.playerIds].sort((a, b) => rating(b) - rating(a) || a.localeCompare(b));
-
-  const pairCount = Math.floor(ranked.length / 2);
-  const unassigned = ranked.slice(pairCount * 2);
-  const pairs: string[][] = [];
-  for (let i = 0; i < pairCount; i += 1) {
-    pairs.push([ranked[i]!, ranked[ranked.length - 1 - unassigned.length - i]!]);
-  }
-
-  const teams = seedTeams(
-    pairs.map((playerIds) => ({ playerIds })),
-    input.ratings,
-    input.fallbackRating,
-    input.nameOf,
-    input.makeId,
-  );
-
-  return { teams, unassigned };
-}
-
-/**
- * Turns already-decided pairs into seeded bracket teams, ordered by combined
- * rating (strongest first). Shared by the snake-paired path above and by the
- * timed-mode captain's draft, which hands in pairs it built a different way.
+ * Turns already-decided pairs (from the captain's draft) into seeded bracket
+ * teams, ordered by combined rating, strongest first.
  */
 export function seedTeams(
   pairs: readonly { playerIds: string[] }[],

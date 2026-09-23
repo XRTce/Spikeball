@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   bracketResult,
-  buildBracketTeams,
   buildSingleElimination,
   eliminationSize,
   nextPowerOfTwo,
   resolveBracket,
   seedOrder,
+  seedTeams,
   supportsThirdPlace,
 } from '../src/domain/pairing/elimination';
 import type { BracketTeam, Match } from '../src/domain/types';
@@ -77,43 +77,20 @@ describe('nextPowerOfTwo', () => {
   });
 });
 
-describe('buildBracketTeams', () => {
-  it('snake-pairs the strongest player with the weakest', () => {
-    const result = buildBracketTeams({
-      playerIds: ['a', 'b', 'c', 'd'],
-      ratings: { a: 1400, b: 1300, c: 1100, d: 900 },
-      fallbackRating: 1000,
-      nameOf: (id) => id,
-      makeId: () => nextId('t'),
-    });
-    expect(result.unassigned).toEqual([]);
-    const pairs = result.teams.map((team) => [...team.playerIds].sort().join(''));
-    expect(pairs).toContain('ad');
-    expect(pairs).toContain('bc');
-  });
-
-  it('leaves the weakest player out of an odd field', () => {
-    const result = buildBracketTeams({
-      playerIds: ['a', 'b', 'c', 'd', 'e'],
-      ratings: { a: 1400, b: 1300, c: 1200, d: 1100, e: 900 },
-      fallbackRating: 1000,
-      nameOf: (id) => id,
-      makeId: () => nextId('t'),
-    });
-    expect(result.unassigned).toEqual(['e']);
-    expect(result.teams).toHaveLength(2);
-  });
-
-  it('seeds teams by combined rating', () => {
-    const result = buildBracketTeams({
-      playerIds: ['a', 'b', 'c', 'd'],
-      ratings: { a: 1400, b: 1300, c: 1100, d: 900 },
-      fallbackRating: 1000,
-      nameOf: (id) => id,
-      makeId: () => nextId('t'),
-    });
-    expect(result.teams[0]!.seed).toBe(1);
-    expect(result.teams.map((t) => t.seed)).toEqual([1, 2]);
+describe('seedTeams', () => {
+  it('seeds drafted pairs by combined rating, strongest first', () => {
+    resetIds();
+    const teams = seedTeams(
+      [{ playerIds: ['c', 'd'] }, { playerIds: ['a', 'b'] }, { playerIds: ['e', 'f'] }],
+      { a: 1400, b: 1300, c: 1100, d: 900, e: 1200 },
+      1000,
+      (id) => id.toUpperCase(),
+      () => nextId('t'),
+    );
+    // e (1200) with f (fallback 1000) averages 1100, between a+b (1350) and c+d (1000).
+    expect(teams.map((team) => team.playerIds.join(''))).toEqual(['ab', 'ef', 'cd']);
+    expect(teams.map((team) => team.seed)).toEqual([1, 2, 3]);
+    expect(teams[0]!.name).toBe('A & B');
   });
 });
 

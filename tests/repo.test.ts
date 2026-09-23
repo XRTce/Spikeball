@@ -325,7 +325,9 @@ describe('timed mode', () => {
     ];
 
     const result = await startDraftedBracket({ tournamentId, teams, thirdPlaceMatch: true });
-    expect(result.unassigned).toEqual([]);
+    // Three teams: a semi-final, the top seed's walkover and the final. Too
+    // few for a third-place match, even though it was asked for.
+    expect(result).toEqual({ matches: 2, rounds: 2 });
 
     const tournament = await db.tournaments.get(tournamentId);
     expect(tournament?.phase).toBe('tournament');

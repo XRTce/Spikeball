@@ -28,8 +28,6 @@ export interface EloSettings {
 export interface PlaySettings {
   /** Target score, used to pre-fill the result entry. */
   pointsToWin: number;
-  /** Only the n highest-rated players enter the tournament; null = everyone. */
-  participantLimit: number | null;
   /** Play a match for third place - only meaningful with at least 4 teams. */
   thirdPlaceMatch: boolean;
 }
@@ -165,6 +163,5 @@ export const DEFAULT_ELO_SETTINGS: EloSettings = {
 
 export const DEFAULT_PLAY_SETTINGS: PlaySettings = {
   pointsToWin: 21,
-  participantLimit: null,
   thirdPlaceMatch: true,
 };
