@@ -122,15 +122,16 @@ open, and `importBackup` runs the same rules from `db/normalize.ts`:
   or finished: `phase: 'casual'`, `status: 'open'`, `format`/`bracket`/
   `startedAt`/`finishedAt` cleared and `inTournament` reset, the state
   `backToCasual` produces.
-- **Results are never lost.** Unlike `backToCasual`, generated matches are not
-  deleted. They, and any match on a removed stage, become `stage: 'casual'`
-  with feeds and slot labels cleared. That is the only stage that is safe
-  outside a running bracket: the round tabs and progress skip it, and
-  `MatchCard` has no label for the old stages. Elo replay and the unfiltered
-  standings never look at `stage`, so every played match keeps counting. The
-  one thing dropped is an unplayed match with an empty side (an undecided
-  losers or grand-final slot), which nothing could ever fill once its feeds
-  are gone. A scheduled match with both teams set stays as a casual game.
+- **Results are never lost.** Unlike `backToCasual`, played matches are not
+  deleted: every finished non-bye match with both teams becomes
+  `stage: 'casual'` history, with feeds and slot labels cleared. Casual is the
+  only stage that is safe outside a running bracket: the round tabs skip it,
+  `MatchCard` has no label for the old stages, and Elo replay and the
+  unfiltered standings never look at `stage`, so those results keep counting.
+  Casual games the organiser set up themselves stay as they were. The rest of
+  the generated schedule (unplayed pairings, undecided bracket slots, byes) is
+  dropped: none of it is a result, and turned into casual games it would
+  flood the queue with games nobody put on court.
 - **Single-elim tournaments keep running** with their bracket and feeds as
   they were; only the field changes above apply.
 - **Old singles (1v1) data is kept as it is.** A team is just an array of
@@ -138,6 +139,9 @@ open, and `importBackup` runs the same rules from `db/normalize.ts`:
   handle a one-player team, so those matches keep rating and rendering. New
   matches are always doubles, and turning a single into a pair would mean
   making up a partner.
+
+Public tournaments need no migration: they were added after the format
+removal, so no public row can have the old shape.
 
 ## Rendering choices worth knowing
 
