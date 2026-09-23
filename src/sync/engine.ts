@@ -13,12 +13,17 @@ import { readSyncAndSnapshot, writeSnapshotRows } from './snapshot';
 import { emitNotice, setSyncing } from './store';
 
 /* ------------------------------------------------------------------------ */
-/* Scheduling: in-flight guard, rerun-after, backoff                         */
+/* Scheduling: one loop per tournament, merged triggers, backoff             */
 /* ------------------------------------------------------------------------ */
 
-const inFlight = new Set<string>();
-/** A trigger arrived while this tournament's loop was already running; run it again once done. */
-const rerunAfter = new Map<string, { pull: boolean }>();
+/**
+ * The running loop for a tournament, if any. A second trigger while one is
+ * already running does not start a second loop (never two loops for one
+ * tournament); it merges into `pendingOpts` and awaits the *same* promise,
+ * which only settles once the loop finds no more requested work.
+ */
+const activeLoop = new Map<string, Promise<void>>();
+const pendingOpts = new Map<string, { pull?: boolean }>();
 const backoffDelay = new Map<string, number>();
 const retryTimer = new Map<string, unknown>();
 
@@ -44,46 +49,53 @@ function scheduleBackoffRetry(tournamentId: string): void {
   retryTimer.set(tournamentId, handle);
 }
 
+function trigger(tournamentId: string, opts: { pull?: boolean }): Promise<void> {
+  const merged = { pull: (pendingOpts.get(tournamentId)?.pull ?? false) || (opts.pull ?? false) };
+  pendingOpts.set(tournamentId, merged);
+
+  const existing = activeLoop.get(tournamentId);
+  if (existing) return existing; // the running loop re-checks pendingOpts before it exits.
+
+  const promise = loop(tournamentId);
+  activeLoop.set(tournamentId, promise);
+  return promise;
+}
+
 /**
  * Triggers a sync attempt for one tournament. Fire-and-forget: callers that
  * need to know the outcome use syncNow(), which awaits the same loop. Safe to
  * call for a local tournament or one with no sync row - it just no-ops.
  */
 export function scheduleSync(tournamentId: string, opts: { pull?: boolean } = {}): void {
-  if (inFlight.has(tournamentId)) {
-    const existing = rerunAfter.get(tournamentId);
-    rerunAfter.set(tournamentId, { pull: (existing?.pull ?? false) || (opts.pull ?? false) });
-    return;
-  }
-  void runSyncLoop(tournamentId, opts);
+  void trigger(tournamentId, opts);
 }
 
 /** Same as scheduleSync, but the caller can await the attempt and never sees it throw. */
 export async function runSyncNow(tournamentId: string): Promise<void> {
-  if (inFlight.has(tournamentId)) {
-    rerunAfter.set(tournamentId, { pull: true });
-    return;
-  }
-  await runSyncLoop(tournamentId, { pull: true });
+  await trigger(tournamentId, { pull: true });
 }
 
-async function runSyncLoop(tournamentId: string, opts: { pull?: boolean }): Promise<void> {
-  inFlight.add(tournamentId);
+async function loop(tournamentId: string): Promise<void> {
   setSyncing(tournamentId, true);
   try {
-    await syncStep(tournamentId, opts);
-    clearBackoff(tournamentId);
-  } catch (err) {
-    await recordSyncError(tournamentId, err);
+    for (;;) {
+      const opts = pendingOpts.get(tournamentId) ?? {};
+      pendingOpts.delete(tournamentId);
+      try {
+        await syncStep(tournamentId, opts);
+        clearBackoff(tournamentId);
+      } catch (err) {
+        await recordSyncError(tournamentId, err);
+        // A failure leaves the backoff timer (or the next explicit trigger)
+        // as the only way to retry - looping immediately here would ignore
+        // backoff entirely while commands keep being queued offline.
+        return;
+      }
+      if (!pendingOpts.has(tournamentId)) return;
+    }
   } finally {
-    inFlight.delete(tournamentId);
+    activeLoop.delete(tournamentId);
     setSyncing(tournamentId, false);
-  }
-
-  const rerun = rerunAfter.get(tournamentId);
-  if (rerun) {
-    rerunAfter.delete(tournamentId);
-    scheduleSync(tournamentId, rerun);
   }
 }
 
@@ -376,8 +388,8 @@ async function flushAllPending(): Promise<void> {
 export function resetSyncEngine(): void {
   for (const tournamentId of [...liveSources.keys()]) closeLiveSource(tournamentId);
   liveRefCounts.clear();
-  inFlight.clear();
-  rerunAfter.clear();
+  activeLoop.clear();
+  pendingOpts.clear();
   backoffDelay.clear();
   for (const tournamentId of [...retryTimer.keys()]) clearRetryTimer(tournamentId);
   started = false;
