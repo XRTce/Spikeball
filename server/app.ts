@@ -361,7 +361,9 @@ export function createApp(options: AppOptions): App {
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Connection', 'keep-alive');
-    res.write('retry: 5000\n\n');
+    // Merged into the same block as the first event below (a bare blank line
+    // here would dispatch it as its own, event-less block).
+    res.write('retry: 5000\n');
 
     const state: StateEvent = { revision: row.revision, protected: row.passwordHash !== null };
     hub.sendState(res, state);
@@ -376,6 +378,10 @@ export function createApp(options: AppOptions): App {
       new Promise<void>((resolve, reject) => {
         clearInterval(retentionTimer);
         clearInterval(sweepTimer);
+        // http.Server#close waits for every open connection to end; an SSE
+        // stream is deliberately never-ending, so it would hang forever
+        // without this.
+        hub.closeAll();
         server.close((error) => {
           store.close();
           if (error) reject(error);
@@ -446,47 +452,57 @@ function sendError(
 
 /**
  * Reads and JSON-parses the request body, capped at LIMITS.bodyBytes without
- * buffering an over-limit body in full. Writes the error response itself and
- * returns undefined when the body could not be used, so callers can
- * `if (body === undefined) return;` and otherwise trust the parsed value's
- * JSON shape (though not yet its domain validity).
+ * buffering an over-limit body in full: once the cap is hit the error is sent
+ * right away and further chunks are discarded rather than collected, so the
+ * rest of an oversized upload never sits in memory. Writes the error response
+ * itself and returns undefined when the body could not be used, so callers
+ * can `if (body === undefined) return;` and otherwise trust the parsed
+ * value's JSON shape (though not yet its domain validity).
+ *
+ * Ending the response without destroying the socket (rather than
+ * `req.destroy()`) lets the client's fetch still receive the 413/400 body
+ * instead of seeing the connection reset.
  */
 async function readJsonBody<T>(req: IncomingMessage, res: ServerResponse): Promise<T | undefined> {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  let tooLarge = false;
+  return new Promise<T | undefined>((resolve) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let settled = false;
 
-  await new Promise<void>((resolve, reject) => {
+    const finish = (value: T | undefined) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
     req.on('data', (chunk: Buffer) => {
-      if (tooLarge) return;
+      if (settled) return; // draining the rest of an over-limit body; nothing more to do with it
       total += chunk.length;
       if (total > LIMITS.bodyBytes) {
-        tooLarge = true;
-        req.destroy();
-        resolve();
+        sendError(res, 'too_large');
+        finish(undefined);
         return;
       }
       chunks.push(chunk);
     });
-    req.on('end', resolve);
-    req.on('error', reject);
-    req.on('aborted', resolve);
+
+    req.on('end', () => {
+      if (settled) return;
+      const raw = Buffer.concat(chunks).toString('utf8');
+      if (raw.length === 0) {
+        sendError(res, 'bad_request', 'empty body');
+        finish(undefined);
+        return;
+      }
+      try {
+        finish(JSON.parse(raw) as T);
+      } catch {
+        sendError(res, 'bad_request', 'invalid JSON');
+        finish(undefined);
+      }
+    });
+
+    req.on('error', () => finish(undefined));
+    req.on('aborted', () => finish(undefined));
   });
-
-  if (tooLarge) {
-    sendError(res, 'too_large');
-    return undefined;
-  }
-
-  const raw = Buffer.concat(chunks).toString('utf8');
-  if (raw.length === 0) {
-    sendError(res, 'bad_request', 'empty body');
-    return undefined;
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    sendError(res, 'bad_request', 'invalid JSON');
-    return undefined;
-  }
 }

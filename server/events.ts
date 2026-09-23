@@ -70,6 +70,20 @@ export class EventHub {
     }
   }
 
+  /** Ends every open stream, for every tournament. Used on graceful shutdown. */
+  closeAll(): void {
+    for (const set of this.streams.values()) {
+      for (const res of set) {
+        try {
+          res.end();
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+    this.streams.clear();
+  }
+
   /** Tells every listener the tournament is gone and closes their streams. */
   broadcastDeleted(tournamentId: string): void {
     const set = this.streams.get(tournamentId);
