@@ -230,9 +230,17 @@ export interface BracketOptions {
 }
 
 /**
- * Builds a seeded single-elimination bracket. A third-place match is only
- * meaningful once there is a real semi-final round (at least 4 teams); with
- * fewer teams `semis` is undefined and the match is simply not created.
+ * A third-place match needs two real semi-final losers, so at least 4 teams.
+ * With 3 teams one semi-final is a walkover, and the "match" for third would
+ * be a walkover too.
+ */
+export function supportsThirdPlace(teamCount: number): boolean {
+  return teamCount >= 4;
+}
+
+/**
+ * Builds a seeded single-elimination bracket. The third-place match is left
+ * out, even if requested, when {@link supportsThirdPlace} says there is none.
  */
 export function buildSingleElimination(
   teams: BracketTeam[],
@@ -244,7 +252,7 @@ export function buildSingleElimination(
   const matches = rounds.flat();
 
   const semis = rounds[rounds.length - 2];
-  if (options.thirdPlaceMatch && semis && semis.length === 2) {
+  if (options.thirdPlaceMatch && supportsThirdPlace(teams.length) && semis?.length === 2) {
     const third = factory.make('third_place', rounds.length, 0);
     link(semis[0]!, 'loser', third, 'A');
     link(semis[1]!, 'loser', third, 'B');
@@ -489,8 +497,6 @@ export function eliminationSize(
   if (teamCount < 2) return { rounds: 0, matches: 0 };
   const size = nextPowerOfTwo(teamCount);
   const k = Math.log2(size);
-  return {
-    rounds: k + (thirdPlaceMatch && k >= 2 ? 1 : 0),
-    matches: teamCount - 1 + (thirdPlaceMatch && k >= 2 ? 1 : 0),
-  };
+  const third = thirdPlaceMatch && supportsThirdPlace(teamCount) ? 1 : 0;
+  return { rounds: k + third, matches: teamCount - 1 + third };
 }

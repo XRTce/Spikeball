@@ -7,6 +7,7 @@ import {
   nextPowerOfTwo,
   resolveBracket,
   seedOrder,
+  supportsThirdPlace,
 } from '../src/domain/pairing/elimination';
 import type { BracketTeam, Match } from '../src/domain/types';
 import { draftToMatch, recordResult, resetIds, resetSequence, nextId } from './helpers';
@@ -131,8 +132,20 @@ describe('single elimination', () => {
   });
 
   it('does not add a third place match with fewer than 4 teams', () => {
-    const { matches } = build(2, true);
-    expect(matches.filter((m) => m.stage === 'third_place')).toHaveLength(0);
+    for (const count of [2, 3]) {
+      const { matches } = build(count, true);
+      expect(matches.filter((m) => m.stage === 'third_place'), `${count} teams`).toHaveLength(0);
+    }
+  });
+
+  it('adds the third place match exactly when supportsThirdPlace allows it', () => {
+    expect(supportsThirdPlace(3)).toBe(false);
+    expect(supportsThirdPlace(4)).toBe(true);
+    for (let count = 2; count <= 9; count += 1) {
+      const { matches } = build(count, true);
+      const thirds = matches.filter((m) => m.stage === 'third_place').length;
+      expect(thirds, `${count} teams`).toBe(supportsThirdPlace(count) ? 1 : 0);
+    }
   });
 
   it('walks byes straight into round two', () => {
@@ -207,7 +220,7 @@ describe('eliminationSize', () => {
     matches.filter((m) => m.status === 'done' && !m.bye).length;
 
   it('predicts the match count', () => {
-    for (const count of [4, 6, 8, 12, 16]) {
+    for (const count of [2, 3, 4, 5, 6, 8, 12, 16]) {
       resetIds();
       const teams = makeTeams(count);
       const plan = buildSingleElimination(teams, {

@@ -23,6 +23,7 @@ import {
   startDraft,
   type DraftState,
 } from '../domain/pairing/draft';
+import { supportsThirdPlace } from '../domain/pairing/elimination';
 import { startDraftedBracket } from '../db/repo';
 import { useGuardedAction } from '../state/useGuardedAction';
 import { isLockedError, useSyncStatus } from '../sync';
@@ -174,7 +175,7 @@ export function DraftScreen() {
             ))}
           </Stack>
 
-          {draft.teams.length >= 4 && (
+          {supportsThirdPlace(draft.teams.length) && (
             <Switch checked={thirdPlace} onChange={setThirdPlace} label={s.more.thirdPlace} />
           )}
 
@@ -192,7 +193,7 @@ export function DraftScreen() {
                   await startDraftedBracket({
                     tournamentId: tournament.id,
                     teams: draft.teams.map((team) => ({ playerIds: [team.captain, team.partner] })),
-                    thirdPlaceMatch: draft.teams.length >= 4 && thirdPlace,
+                    thirdPlaceMatch: supportsThirdPlace(draft.teams.length) && thirdPlace,
                   });
                   toast.success(s.draft.created);
                   navigate(`/t/${tournament.id}`);
