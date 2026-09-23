@@ -8,13 +8,25 @@ import { gzipSync } from 'node:zlib';
 import { join, normalize, sep } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-const SECURITY_HEADERS: Record<string, string> = {
-  'Content-Security-Policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), interest-cohort=()',
-};
+/**
+ * `connect-src 'self'` is right for the common case, where the same server
+ * both serves the built PWA and answers its API calls. It breaks a build
+ * that was made with `VITE_SYNC_URL` pointing at a *different* sync server
+ * origin, if that build is then also served from here: the app's own fetch
+ * and EventSource calls would be blocked by the browser. `connectSrc` lets a
+ * deployment add that other origin explicitly (see docs/SYNC.md);
+ * left unset, the policy is unchanged.
+ */
+function buildSecurityHeaders(connectSrc?: string | null): Record<string, string> {
+  const connect = connectSrc ? `'self' ${connectSrc}` : "'self'";
+  return {
+    'Content-Security-Policy':
+      `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src ${connect}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'`,
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), interest-cohort=()',
+  };
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -87,9 +99,11 @@ function looksLikeStaticAsset(pathname: string): boolean {
 export class StaticServer {
   private readonly root: string | null;
   private readonly cache = new Map<string, CacheEntry>();
+  private readonly securityHeaders: Record<string, string>;
 
-  constructor(root: string | null) {
+  constructor(root: string | null, connectSrc?: string | null) {
     this.root = root && existsSync(root) ? root : null;
+    this.securityHeaders = buildSecurityHeaders(connectSrc);
   }
 
   get available(): boolean {
@@ -140,7 +154,7 @@ export class StaticServer {
     res.setHeader('Cache-Control', cacheControlFor(relativePath));
     if (useGzip) res.setHeader('Content-Encoding', 'gzip');
     if (relativePath === 'sw.js') res.setHeader('Service-Worker-Allowed', '/');
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+    for (const [name, value] of Object.entries(this.securityHeaders)) res.setHeader(name, value);
 
     if (req.method === 'HEAD') {
       res.end();

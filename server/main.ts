@@ -26,7 +26,10 @@ const staticDir = process.env.RALLY_STATIC_DIR ? resolve(process.env.RALLY_STATI
 // Compose passes unset variables through as empty strings.
 const corsOrigin = process.env.RALLY_CORS_ORIGIN || null;
 const retentionDays = envInt('RALLY_RETENTION_DAYS', 365);
-const trustProxy = process.env.RALLY_TRUST_PROXY === '1';
+// A bare '1' (the old boolean spelling) keeps meaning "one trusted hop"; any
+// other positive integer trusts that many hops instead. See docs/SYNC.md.
+const trustProxy = envInt('RALLY_TRUST_PROXY', 0);
+const connectSrc = process.env.RALLY_CONNECT_SRC || null;
 
 mkdirSync(dirname(dbPath), { recursive: true });
 
@@ -35,6 +38,7 @@ const app = createApp({
   staticDir,
   corsOrigin,
   trustProxy,
+  connectSrc,
   retentionDays,
 });
 

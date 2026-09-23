@@ -38,8 +38,19 @@ export interface AppOptions {
   staticDir?: string | null;
   /** Cross-origin app origin allowed to call the API, '*' for any, unset = same-origin only. */
   corsOrigin?: string | null;
-  /** Trust X-Forwarded-For for the rate limiter's client key. */
-  trustProxy?: boolean;
+  /** Extra origin(s) to allow in the static pages' CSP connect-src, for a build whose VITE_SYNC_URL points elsewhere. */
+  connectSrc?: string | null;
+  /**
+   * Number of trusted reverse-proxy hops in front of this server. `0`
+   * (default) ignores X-Forwarded-For entirely and keys the rate limiter on
+   * the TCP peer address. `1` trusts a single proxy directly in front of the
+   * server and reads the client address it appended - the *rightmost* entry
+   * of X-Forwarded-For, never the leftmost, which is fully client-controlled
+   * and would let a client bypass the password rate limit by sending a fresh
+   * value on every request. Set this only when the port is reachable
+   * exclusively through that many trusted proxies (see docs/SYNC.md).
+   */
+  trustProxy?: number;
   retentionDays?: number;
   /** Injectable clock, for tests. */
   now?: () => number;
@@ -64,13 +75,13 @@ const ALLOWED_API_HEADERS = `Content-Type, ${PASSWORD_HEADER}`;
 export function createApp(options: AppOptions): App {
   const now = options.now ?? Date.now;
   const retentionDays = options.retentionDays ?? DEFAULT_RETENTION_DAYS;
-  const trustProxy = options.trustProxy ?? false;
+  const trustProxy = options.trustProxy ?? 0;
   const corsOrigin = options.corsOrigin ?? null;
 
   const store = new Store(options.dbPath);
   const hub = new EventHub();
   const rateLimiter = new RateLimiter(10, 10 * 60 * 1000, now);
-  const staticServer = new StaticServer(options.staticDir ?? null);
+  const staticServer = new StaticServer(options.staticDir ?? null, options.connectSrc ?? null);
 
   function runRetentionSweep(): void {
     const cutoff = now() - retentionDays * DAY_MS;
@@ -134,6 +145,12 @@ export function createApp(options: AppOptions): App {
     const idMatch = pathname.match(/^\/api\/tournaments\/([^/]+)$/);
     if (idMatch) {
       const id = idMatch[1]!;
+      // The id doubles as the share secret (see validate.ts), so a
+      // malformed one can never name a real tournament; answering the same
+      // 404 the store would give for an unknown-but-well-shaped id, instead
+      // of the length check create alone used to apply, avoids leaking which
+      // shapes are worth guessing and keeps every route consistent.
+      if (!isValidTournamentId(id)) return sendError(res, 'not_found');
       if (req.method === 'GET') return handleFetch(res, id);
       if (req.method === 'PUT') return handlePush(req, res, id);
       if (req.method === 'DELETE') return handleDelete(req, res, id);
@@ -144,6 +161,7 @@ export function createApp(options: AppOptions): App {
     if (subMatch) {
       const id = subMatch[1]!;
       const action = subMatch[2]!;
+      if (!isValidTournamentId(id)) return sendError(res, 'not_found');
       if (action === 'unlock' && req.method === 'POST') return handleUnlock(req, res, id);
       if (action === 'password' && req.method === 'PUT') return handlePassword(req, res, id);
       if (action === 'events' && req.method === 'GET') return handleEvents(res, id);
@@ -414,11 +432,30 @@ function readPasswordHeader(req: IncomingMessage): string | null {
   return null;
 }
 
-function clientKey(req: IncomingMessage, trustProxy: boolean): string {
-  if (trustProxy) {
+/**
+ * X-Forwarded-For is appended-to, left to right, by every proxy the request
+ * passes through: each hop adds the peer address *it* saw to the right end,
+ * so the entry nearest the server was written by the proxy directly in front
+ * of it. The leftmost entry is whatever the original client sent and is
+ * therefore fully attacker-controlled - trusting it (as an earlier version of
+ * this function did) let a client bypass the rate limiter by sending a fresh
+ * spoofed value on every request. With `hops` trusted proxies, the client's
+ * real address is `hops` entries in from the right; if the header has fewer
+ * entries than that (a misconfigured or lied-about proxy count) we fall back
+ * to the raw socket address rather than trust a value we can't place.
+ */
+function clientKey(req: IncomingMessage, hops: number): string {
+  if (hops > 0) {
     const forwarded = req.headers['x-forwarded-for'];
-    const first = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0];
-    if (first && first.trim().length > 0) return first.trim();
+    const raw = Array.isArray(forwarded) ? forwarded.join(',') : forwarded;
+    if (raw) {
+      const entries = raw
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      const index = entries.length - hops;
+      if (index >= 0) return entries[index]!;
+    }
   }
   return req.socket.remoteAddress ?? 'unknown';
 }
