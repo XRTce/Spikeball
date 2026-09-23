@@ -107,7 +107,7 @@ export function PlayerDetailScreen() {
             <Stat value={row?.losses ?? 0} label={s.table.losses} />
             <Stat
               value={`${Math.round((row?.winRate ?? 0) * 100)}%`}
-              label="Siegquote"
+              label={s.table.winRate}
             />
           </StatGrid>
 
@@ -124,7 +124,7 @@ export function PlayerDetailScreen() {
 
           {partners.length > 0 && (
             <>
-              <SectionTitle>Bilanz gegen und mit</SectionTitle>
+              <SectionTitle>{s.table.headToHead}</SectionTitle>
               <div className={css.relations}>
                 {partners.map(({ other, asPartners, asOpponents }) => (
                   <div key={other.id} className={css.relationRow}>

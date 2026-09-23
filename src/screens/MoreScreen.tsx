@@ -128,11 +128,11 @@ export function MoreScreen() {
               action={
                 tournament.status === 'finished' ? (
                   <Badge tone="neutral" icon="trophy">
-                    Beendet
+                    {s.more.statusFinished}
                   </Badge>
                 ) : isTournament ? (
                   <Badge tone="brand" icon="bracket">
-                    läuft
+                    {s.more.statusRunning}
                   </Badge>
                 ) : null
               }
@@ -148,7 +148,7 @@ export function MoreScreen() {
                       block
                       onClick={() => guard.run(() => reopenTournament(tournament.id))}
                     >
-                      Turnier wieder öffnen
+                      {s.more.reopen}
                     </Button>
                   ) : (
                     <Button
@@ -319,7 +319,7 @@ export function MoreScreen() {
             </CardBody>
           </Card>
 
-          <SectionTitle>Turnier</SectionTitle>
+          <SectionTitle>{s.more.tournamentSection}</SectionTitle>
           <Card>
             <CardBody>
               <Stack>

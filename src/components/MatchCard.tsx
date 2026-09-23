@@ -61,7 +61,7 @@ function Side({ ids, label, score, isWinner, decided, playerById, deltas }: Side
         {ids.length > 0 ? (
           <span className={css.name}>{teamLabel(ids, playerById)}</span>
         ) : (
-          <span className={css.placeholder}>{label ?? 'Noch offen'}</span>
+          <span className={css.placeholder}>{label ?? s.play.teamPending}</span>
         )}
         {deltas && ids.length > 0 && (
           <span className={css.deltas}>
@@ -188,7 +188,7 @@ export function MatchCard({
             size="sm"
             variant="ghost"
             icon="more"
-            aria-label="Weitere Aktionen"
+            aria-label={s.play.matchActions}
             onClick={() => onOpenActions(match)}
           />
         )}
@@ -237,7 +237,7 @@ export function ResultSheet({
   }, [match, play.pointsToWin]);
 
   const problem = useMemo(() => {
-    if (scoreA === scoreB) return 'Unentschieden gibt es beim Roundnet nicht.';
+    if (scoreA === scoreB) return s.play.noDraws;
     return null;
   }, [scoreA, scoreB]);
 
@@ -291,7 +291,7 @@ export function ResultSheet({
             />
             <span className={css.entryNames}>{nameA}</span>
           </div>
-          <NumberStepper value={scoreA} onChange={setScoreA} max={99} ariaLabel={`Punkte ${nameA}`} />
+          <NumberStepper value={scoreA} onChange={setScoreA} max={99} ariaLabel={s.play.pointsFor(nameA)} />
         </div>
 
         <div className={cx(css.entryTeam, scoreB > scoreA && css.entryLeading)}>
@@ -306,7 +306,7 @@ export function ResultSheet({
             />
             <span className={css.entryNames}>{nameB}</span>
           </div>
-          <NumberStepper value={scoreB} onChange={setScoreB} max={99} ariaLabel={`Punkte ${nameB}`} />
+          <NumberStepper value={scoreB} onChange={setScoreB} max={99} ariaLabel={s.play.pointsFor(nameB)} />
         </div>
 
         <div className={css.presets}>

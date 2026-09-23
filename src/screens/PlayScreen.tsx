@@ -114,7 +114,7 @@ export function PlayScreen() {
           guard.run(async () => {
             await scheduleCasualMatch(tournament.id, teamA, teamB);
             setPickerOpen(false);
-            toast.success('Spiel steht auf dem Platz');
+            toast.success(s.play.matchScheduled);
           })
         }
       />
@@ -252,7 +252,7 @@ function CasualPlay({
           ) : suggestion ? (
             <div className={css.suggestion}>
               <div className={css.suggestionHead}>
-                <span className={css.suggestionTitle}>Nächstes Spiel</span>
+                <span className={css.suggestionTitle}>{s.play.nextMatch}</span>
                 <Badge tone={Math.abs(probability - 0.5) < 0.06 ? 'accent' : 'neutral'}>
                   {Math.abs(probability - 0.5) < 0.06
                     ? s.play.even
@@ -273,7 +273,7 @@ function CasualPlay({
                     {teamLabel(suggestion.teamA, view.playerById)}
                   </span>
                 </div>
-                <span className={css.vs}>vs</span>
+                <span className={css.vs}>{s.play.versus}</span>
                 <div className={css.team}>
                   <AvatarStack
                     people={suggestion.teamB.map((id) => ({
@@ -416,7 +416,7 @@ function TournamentPlay({
                 {tournament.status === 'finished' ? s.play.finished : s.more.running}
               </div>
               <div className={css.progressMeta}>
-                {progress.played} von {progress.total} {s.common.matches}
+                {s.play.progressOf(progress.played, progress.total)}
               </div>
               <div className={css.progressBar}>
                 <Progress value={progress.played} max={Math.max(1, progress.total)} />

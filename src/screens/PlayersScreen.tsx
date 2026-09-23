@@ -158,12 +158,12 @@ export function PlayersScreen() {
                         <div className={css.meta}>
                           <span>{s.players.played(played)}</span>
                           <EloDelta value={rating - player.baseElo} showZero={false} />
-                          {player.inTournament && <Badge tone="brand">Turnier</Badge>}
+                          {player.inTournament && <Badge tone="brand">{s.players.inTournament}</Badge>}
                         </div>
                       </button>
                       <div className={css.elo}>
                         <div className={css.eloValue}>{rating}</div>
-                        <div className={css.eloBase}>von {player.baseElo}</div>
+                        <div className={css.eloBase}>{s.players.fromBaseElo(player.baseElo)}</div>
                       </div>
                       <button
                         type="button"
@@ -223,7 +223,7 @@ export function PlayersScreen() {
         runGuarded={guard.run}
         onDone={(count) => {
           setCloneOpen(false);
-          toast.success(`${count} ${count === 1 ? 'Spieler' : 'Spieler'} übernommen`);
+          toast.success(s.players.cloned(count));
         }}
       />
       {guard.sheet}
@@ -292,7 +292,7 @@ function EditPlayerSheet({
         />
         <NumberStepper
           label={s.players.startElo}
-          hint="Alle Spiele werden neu berechnet"
+          hint={s.players.startEloHint}
           value={baseElo}
           onChange={setBaseElo}
           min={100}
@@ -368,15 +368,15 @@ function ClonePlayersSheet({
     >
       <div className={css.cloneList}>
         {entries.length === 0 ? (
-          <p className={form.hint}>Es gibt kein anderes Turnier mit Spielern.</p>
+          <p className={form.hint}>{s.players.cloneNoSource}</p>
         ) : (
           <>
             <SelectField
-              label="Turnier"
+              label={s.players.cloneSource}
               value={sourceId}
               onChange={(event) => setSourceId(event.currentTarget.value)}
             >
-              <option value="">Bitte wählen</option>
+              <option value="">{s.players.cloneSourcePlaceholder}</option>
               {entries.map(({ tournament, players }) => (
                 <option key={tournament.id} value={tournament.id}>
                   {tournament.name} ({players})
@@ -394,7 +394,7 @@ function ClonePlayersSheet({
             />
             <p className={form.hint}>{s.create.cloneHint}</p>
             <p className={form.hint}>
-              <Icon name="info" size={13} /> Namen, die es hier schon gibt, werden übersprungen.
+              <Icon name="info" size={13} /> {s.players.cloneSkipsDuplicates}
             </p>
           </>
         )}

@@ -90,7 +90,7 @@ export function TableScreen() {
           {hasTournamentMatches && (
             <div className={css.scope}>
               <Segmented
-                ariaLabel="Zeitraum"
+                ariaLabel={s.table.scope}
                 value={scope}
                 onChange={setScope}
                 options={[
