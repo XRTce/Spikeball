@@ -18,6 +18,19 @@ import {
   seedTeams,
   type BracketMatchDraft,
 } from '../domain/pairing/elimination';
+// Every mutation below that can touch a public tournament is wrapped with
+// command(): unchanged for a local tournament, queued and replayable for a
+// public one (docs/SYNC.md, "Commands"). The wrapped function keeps the
+// exported name and signature; screens are none the wiser.
+import { command } from '../sync/commands';
+
+async function matchTournamentId(matchId: string): Promise<string | null> {
+  return (await db.matches.get(matchId))?.tournamentId ?? null;
+}
+
+async function playerTournamentId(playerId: string): Promise<string | null> {
+  return (await db.players.get(playerId))?.tournamentId ?? null;
+}
 
 /* ------------------------------------------------------------------------ */
 /* Reads                                                                      */
@@ -107,30 +120,39 @@ export async function createTournament(input: CreateTournamentInput): Promise<st
   return id;
 }
 
-export async function updateTournament(
+async function updateTournamentImpl(
   id: string,
   patch: Partial<Omit<Tournament, 'id'>>,
 ): Promise<void> {
   await db.tournaments.update(id, { ...patch, updatedAt: Date.now() });
 }
+export const updateTournament = command('updateTournament', (id) => id, updateTournamentImpl);
 
+/**
+ * Removes this device's copy only ("remove from this device"). Stays
+ * local-only even for a public tournament - deleting it for everyone is
+ * deleteTournamentEverywhere() in src/sync. Its sync bookkeeping is removed
+ * along with it, if any.
+ */
 export async function deleteTournament(id: string): Promise<void> {
-  await db.transaction('rw', db.tournaments, db.players, db.matches, async () => {
+  await db.transaction('rw', db.tournaments, db.players, db.matches, db.sync, async () => {
     await db.matches.where('tournamentId').equals(id).delete();
     await db.players.where('tournamentId').equals(id).delete();
     await db.tournaments.delete(id);
+    await db.sync.delete(id);
   });
 }
 
-export async function renameTournament(id: string, name: string): Promise<void> {
-  await updateTournament(id, { name: name.trim() || 'Turnier' });
+async function renameTournamentImpl(id: string, name: string): Promise<void> {
+  await updateTournamentImpl(id, { name: name.trim() || 'Turnier' });
 }
+export const renameTournament = command('renameTournament', (id) => id, renameTournamentImpl);
 
 /* ------------------------------------------------------------------------ */
 /* Players                                                                    */
 /* ------------------------------------------------------------------------ */
 
-export async function addPlayer(
+async function addPlayerImpl(
   tournamentId: string,
   name: string,
   baseElo?: number,
@@ -155,8 +177,9 @@ export async function addPlayer(
   await recalculate(tournamentId);
   return id;
 }
+export const addPlayer = command('addPlayer', (tournamentId) => tournamentId, addPlayerImpl);
 
-export async function updatePlayer(
+async function updatePlayerImpl(
   id: string,
   patch: Partial<Omit<Player, 'id' | 'tournamentId'>>,
 ): Promise<void> {
@@ -166,8 +189,9 @@ export async function updatePlayer(
   // Editing the base rating changes the starting point of the whole replay.
   await recalculate(player.tournamentId);
 }
+export const updatePlayer = command('updatePlayer', playerTournamentId, updatePlayerImpl);
 
-export async function deletePlayer(id: string): Promise<void> {
+async function deletePlayerImpl(id: string): Promise<void> {
   const player = await db.players.get(id);
   if (!player) return;
   await db.transaction('rw', db.players, db.matches, db.tournaments, async () => {
@@ -183,6 +207,7 @@ export async function deletePlayer(id: string): Promise<void> {
   });
   await recalculate(player.tournamentId);
 }
+export const deletePlayer = command('deletePlayer', playerTournamentId, deletePlayerImpl);
 
 /** Copies a player list into another tournament, optionally carrying ratings. */
 async function copyPlayers(
@@ -223,7 +248,7 @@ async function copyPlayers(
  * over as the new base rating, so a series of evenings can build on each other
  * while every tournament still owns its own independent rating history.
  */
-export async function clonePlayersFrom(
+async function clonePlayersFromImpl(
   targetTournamentId: string,
   sourceTournamentId: string,
   ratingSource: 'current' | 'base',
@@ -242,6 +267,11 @@ export async function clonePlayersFrom(
   await recalculate(targetTournamentId);
   return copied;
 }
+export const clonePlayersFrom = command(
+  'clonePlayersFrom',
+  (targetTournamentId) => targetTournamentId,
+  clonePlayersFromImpl,
+);
 
 /* ------------------------------------------------------------------------ */
 /* Matches                                                                    */
@@ -277,7 +307,7 @@ function nextSequence(matches: Match[]): number {
 }
 
 /** Puts a match on the pitch without a result yet. */
-export async function scheduleCasualMatch(
+async function scheduleCasualMatchImpl(
   tournamentId: string,
   teamA: string[],
   teamB: string[],
@@ -287,9 +317,14 @@ export async function scheduleCasualMatch(
   await touch(tournamentId);
   return match.id;
 }
+export const scheduleCasualMatch = command(
+  'scheduleCasualMatch',
+  (tournamentId) => tournamentId,
+  scheduleCasualMatchImpl,
+);
 
 /** Records a finished ad-hoc match in one step. */
-export async function recordCasualResult(
+async function recordCasualResultImpl(
   tournamentId: string,
   teamA: string[],
   teamB: string[],
@@ -313,12 +348,13 @@ export async function recordCasualResult(
   await recalculate(tournamentId);
   return id;
 }
+export const recordCasualResult = command(
+  'recordCasualResult',
+  (tournamentId) => tournamentId,
+  recordCasualResultImpl,
+);
 
-export async function setMatchResult(
-  matchId: string,
-  scoreA: number,
-  scoreB: number,
-): Promise<void> {
+async function setMatchResultImpl(matchId: string, scoreA: number, scoreB: number): Promise<void> {
   const match = await db.matches.get(matchId);
   if (!match) return;
 
@@ -338,8 +374,9 @@ export async function setMatchResult(
 
   await recalculate(match.tournamentId);
 }
+export const setMatchResult = command('setMatchResult', matchTournamentId, setMatchResultImpl);
 
-export async function clearMatchResult(matchId: string): Promise<void> {
+async function clearMatchResultImpl(matchId: string): Promise<void> {
   const match = await db.matches.get(matchId);
   if (!match) return;
   await db.matches.update(matchId, {
@@ -351,24 +388,23 @@ export async function clearMatchResult(matchId: string): Promise<void> {
   });
   await recalculate(match.tournamentId);
 }
+export const clearMatchResult = command('clearMatchResult', matchTournamentId, clearMatchResultImpl);
 
-export async function deleteMatch(matchId: string): Promise<void> {
+async function deleteMatchImpl(matchId: string): Promise<void> {
   const match = await db.matches.get(matchId);
   if (!match) return;
   await db.matches.delete(matchId);
   await recalculate(match.tournamentId);
 }
+export const deleteMatch = command('deleteMatch', matchTournamentId, deleteMatchImpl);
 
-export async function swapMatchPlayers(
-  matchId: string,
-  teamA: string[],
-  teamB: string[],
-): Promise<void> {
+async function swapMatchPlayersImpl(matchId: string, teamA: string[], teamB: string[]): Promise<void> {
   const match = await db.matches.get(matchId);
   if (!match) return;
   await db.matches.update(matchId, { teamA, teamB });
   await recalculate(match.tournamentId);
 }
+export const swapMatchPlayers = command('swapMatchPlayers', matchTournamentId, swapMatchPlayersImpl);
 
 /* ------------------------------------------------------------------------ */
 /* Tournament mode                                                            */
@@ -414,13 +450,18 @@ function planEliminationBracket(
 }
 
 /** Starts the countdown for a timed tournament's free-play phase. */
-export async function startFreePlayTimer(tournamentId: string): Promise<void> {
+async function startFreePlayTimerImpl(tournamentId: string): Promise<void> {
   const tournament = await db.tournaments.get(tournamentId);
   if (!tournament?.timedMode || tournament.timedMode.timerStartedAt !== null) return;
-  await updateTournament(tournamentId, {
+  await updateTournamentImpl(tournamentId, {
     timedMode: { ...tournament.timedMode, timerStartedAt: Date.now() },
   });
 }
+export const startFreePlayTimer = command(
+  'startFreePlayTimer',
+  (tournamentId) => tournamentId,
+  startFreePlayTimerImpl,
+);
 
 export interface StartDraftedBracketInput {
   tournamentId: string;
@@ -435,7 +476,7 @@ export interface StartDraftedBracketInput {
  * and the bracket construction itself happen here. Players not part of any
  * team become spectators.
  */
-export async function startDraftedBracket(
+async function startDraftedBracketImpl(
   input: StartDraftedBracketInput,
 ): Promise<StartTournamentResult> {
   const result = await db.transaction('rw', db.tournaments, db.players, db.matches, async () => {
@@ -491,17 +532,24 @@ export async function startDraftedBracket(
   await recalculate(input.tournamentId);
   return result;
 }
+export const startDraftedBracket = command(
+  'startDraftedBracket',
+  (input) => input.tournamentId,
+  startDraftedBracketImpl,
+);
 
-export async function finishTournament(tournamentId: string): Promise<void> {
-  await updateTournament(tournamentId, { status: 'finished', finishedAt: Date.now() });
+async function finishTournamentImpl(tournamentId: string): Promise<void> {
+  await updateTournamentImpl(tournamentId, { status: 'finished', finishedAt: Date.now() });
 }
+export const finishTournament = command('finishTournament', (tournamentId) => tournamentId, finishTournamentImpl);
 
-export async function reopenTournament(tournamentId: string): Promise<void> {
-  await updateTournament(tournamentId, { status: 'running', finishedAt: null });
+async function reopenTournamentImpl(tournamentId: string): Promise<void> {
+  await updateTournamentImpl(tournamentId, { status: 'running', finishedAt: null });
 }
+export const reopenTournament = command('reopenTournament', (tournamentId) => tournamentId, reopenTournamentImpl);
 
 /** Drops the generated schedule and returns to the open ad-hoc queue. */
-export async function backToCasual(tournamentId: string): Promise<void> {
+async function backToCasualImpl(tournamentId: string): Promise<void> {
   await db.transaction('rw', db.tournaments, db.players, db.matches, async () => {
     const matches = await db.matches.where('tournamentId').equals(tournamentId).toArray();
     const generated = matches.filter((match) => match.stage !== 'casual');
@@ -522,6 +570,7 @@ export async function backToCasual(tournamentId: string): Promise<void> {
   });
   await recalculate(tournamentId);
 }
+export const backToCasual = command('backToCasual', (tournamentId) => tournamentId, backToCasualImpl);
 
 /* ------------------------------------------------------------------------ */
 /* Recalculation                                                              */

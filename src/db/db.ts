@@ -95,7 +95,7 @@ export class RallyDatabase extends Dexie {
 export const db = new RallyDatabase();
 
 /** RFC 4122 v4 id, with a fallback for browsers without randomUUID. */
-export function makeId(): string {
+function randomId(): string {
   const globalCrypto = globalThis.crypto;
   if (globalCrypto && typeof globalCrypto.randomUUID === 'function') {
     return globalCrypto.randomUUID();
@@ -110,6 +110,73 @@ export function makeId(): string {
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
   const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * `makeId()` normally just hands out a fresh random id. While a public-
+ * tournament command runs, `withIdTape` switches it to one of two modes so
+ * the sync engine can replay a command deterministically (docs/SYNC.md,
+ * "Replay"):
+ *
+ * - `record`: every id handed out is remembered, in call order.
+ * - `replay`: ids are played back from a previous recording instead of being
+ *   randomly generated, so a match created offline keeps the same id when the
+ *   command runs again on top of a newer server snapshot. Once the recording
+ *   is exhausted (the command now creates something it didn't before) it
+ *   falls back to random ids.
+ *
+ * This is a plain module-level variable, not something scoped per call: it is
+ * safe only because commands on a public tournament are run one at a time
+ * through a single global queue (src/sync/commands.ts), so tapes never
+ * interleave. `recalculate()` and other nested helpers a command calls share
+ * the same tape, which is what makes replay deterministic for them too.
+ */
+type IdTape =
+  | { kind: 'record'; ids: string[] }
+  | { kind: 'replay'; ids: string[]; index: number };
+
+let activeTape: IdTape | null = null;
+
+export function makeId(): string {
+  if (activeTape) {
+    if (activeTape.kind === 'replay') {
+      if (activeTape.index < activeTape.ids.length) {
+        return activeTape.ids[activeTape.index++]!;
+      }
+      // Recording ran out: this run of the command creates more things than
+      // the original did. Fall back to fresh ids for the rest.
+    } else {
+      const id = randomId();
+      activeTape.ids.push(id);
+      return id;
+    }
+  }
+  return randomId();
+}
+
+export type IdTapeMode = { mode: 'record' } | { mode: 'replay'; ids: string[] };
+
+/**
+ * Runs `fn` with `makeId()` switched to record or replay mode, and returns
+ * both its result and the ids that were recorded (in record mode) or
+ * consumed from the recording (in replay mode, capped to what was actually
+ * used).
+ */
+export async function withIdTape<T>(
+  tape: IdTapeMode,
+  fn: () => Promise<T>,
+): Promise<{ result: T; ids: string[] }> {
+  const previous = activeTape;
+  const next: IdTape =
+    tape.mode === 'record' ? { kind: 'record', ids: [] } : { kind: 'replay', ids: tape.ids, index: 0 };
+  activeTape = next;
+  try {
+    const result = await fn();
+    const ids = next.kind === 'record' ? next.ids : next.ids.slice(0, next.index);
+    return { result, ids };
+  } finally {
+    activeTape = previous;
+  }
 }
 
 export type StorageMode = 'persistent' | 'best-effort' | 'unsupported';
