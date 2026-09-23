@@ -16,7 +16,13 @@ import {
 import { usePlayerColors } from '../state/playerColors';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
-import { startDraft, pickPartner, isDraftComplete, type DraftState } from '../domain/pairing/draft';
+import {
+  MIN_DRAFT_PLAYERS,
+  isDraftComplete,
+  pickPartner,
+  startDraft,
+  type DraftState,
+} from '../domain/pairing/draft';
 import { startDraftedBracket } from '../db/repo';
 import { useGuardedAction } from '../state/useGuardedAction';
 import { isLockedError, useSyncStatus } from '../sync';
@@ -25,7 +31,7 @@ import css from './PlayScreen.module.css';
 const s = strings;
 
 function clampEven(value: number, max: number): number {
-  const clamped = Math.min(value, max);
+  const clamped = Math.min(Math.max(value, MIN_DRAFT_PLAYERS), max);
   return clamped - (clamped % 2);
 }
 
@@ -72,11 +78,11 @@ export function DraftScreen() {
               label={s.draft.setupTitle}
               value={size}
               onChange={(value) => setSize(clampEven(value, ranked.length))}
-              min={4}
+              min={MIN_DRAFT_PLAYERS}
               max={clampEven(ranked.length, ranked.length)}
               step={2}
             />
-            {ranked.length < 4 ? (
+            {ranked.length < MIN_DRAFT_PLAYERS ? (
               <p className={css.pickerCount}>{s.draft.tooFewPlayers}</p>
             ) : (
               <Button
