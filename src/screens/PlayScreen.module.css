@@ -58,7 +58,19 @@
 }
 
 .actions { display: grid; gap: var(--space-2); }
-.actionRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
+/* Two fixed halves clip "Selbst aufstellen" on most phones. Each button starts
+   at its natural width and the row wraps to one full-width button per line
+   when both do not fit side by side. */
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actionRow > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 
 .progressRow {
   display: flex;

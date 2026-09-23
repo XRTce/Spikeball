@@ -45,7 +45,9 @@ export function Button({
     <button type={type} className={classes} disabled={disabled || busy} {...rest}>
       <span className={busy ? `${css.label} ${css.hiddenLabel}` : css.label}>
         {icon && <Icon name={icon} size={iconSize} />}
-        {children}
+        {/* text-overflow only works on a block container holding the text, not
+            on the flex container around it, so the text needs its own box. */}
+        {!iconOnly && children !== false && <span className={css.text}>{children}</span>}
         {iconAfter && <Icon name={iconAfter} size={iconSize} />}
       </span>
       {busy && (
