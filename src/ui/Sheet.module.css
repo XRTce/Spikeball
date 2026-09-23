@@ -79,13 +79,20 @@
 .actions {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--border);
   background: var(--surface-2);
 }
 
-.actions > * { flex: 1; min-width: 0; }
+/* Each action starts at its label's natural width and the rest of the row is
+   shared out, so a short "Abbrechen" leaves room for a longer primary label
+   instead of both getting a fixed half. When the labels cannot sit side by
+   side the row wraps and every action takes a full-width line; min-width: 0
+   only matters for a single label wider than the sheet, which then ends in
+   an ellipsis rather than pushing the footer sideways. */
+.actions > * { flex: 1 1 auto; min-width: 0; }
 
 .confirmText {
   font-size: var(--text-base);
