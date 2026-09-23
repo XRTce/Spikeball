@@ -151,7 +151,6 @@ export function PlayersScreen() {
                       <button
                         type="button"
                         className={css.info}
-                        style={{ textAlign: 'left' }}
                         onClick={() => navigate(`/t/${tournament.id}/player/${player.id}`)}
                       >
                         <div className={css.name}>{player.name}</div>
@@ -177,11 +176,9 @@ export function PlayersScreen() {
                       </button>
                       <Button
                         variant="ghost"
-                        size="sm"
                         icon="pencil"
                         aria-label={s.players.edit}
                         onClick={() => setEditing(player)}
-                        style={{ gridColumn: '4' }}
                       />
                     </div>
                   );
