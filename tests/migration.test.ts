@@ -92,7 +92,7 @@ function played(scoreA: number, scoreB: number, sequence: number) {
 
 const LEGACY = {
   tournaments: [
-    // Round robin, mid-schedule, one casual game played before it started.
+    // Round robin, mid-schedule, with casual games the organiser set up.
     oldTournament('rr', {}),
     // Double elim, mid-bracket: a current stage mixed with removed ones.
     oldTournament('de', {
@@ -136,6 +136,7 @@ const LEGACY = {
     oldMatch('rr-1', 'rr', {
       teamA: ['p1', 'p2'], teamB: ['p3', 'p4'], ...played(21, 14, 2),
     }),
+    oldMatch('rr-court', 'rr', { stage: 'casual', teamA: ['p1', 'p2'], teamB: ['p3', 'p4'] }),
     oldMatch('rr-2', 'rr', { round: 2, teamA: ['p1', 'p4'], teamB: ['p2', 'p3'] }),
     oldMatch('rr-bye', 'rr', {
       round: 2, order: 1, teamA: ['p1'], teamB: [], bye: true, status: 'done',
@@ -223,17 +224,15 @@ describe('Dexie v3 upgrade of a pre-refactor database', () => {
     expect(players.every((p) => !p.inTournament)).toBe(true);
   });
 
-  it('keeps every round-robin result as casual history that still rates', async () => {
+  it('keeps casual games and round-robin results, dropping the rest of the schedule', async () => {
     const rr = await tournament('rr');
     const matches = await listMatches('rr');
-    expect(matches.map((m) => m.id).sort()).toEqual(['rr-1', 'rr-2', 'rr-bye', 'rr-casual']);
+    // rr-2 (unplayed pairing) and rr-bye were only the generated schedule.
+    expect(matches.map((m) => m.id).sort()).toEqual(['rr-1', 'rr-casual', 'rr-court']);
     expect(matches.every((m) => m.stage === 'casual')).toBe(true);
-    // The pairing already on court stays playable as a casual game.
-    expect(matches.find((m) => m.id === 'rr-2')).toMatchObject({
-      status: 'scheduled',
-      teamA: ['p1', 'p4'],
-      teamB: ['p2', 'p3'],
-    });
+    expect(matches.find((m) => m.id === 'rr-1')).toMatchObject({ status: 'done', scoreA: 21 });
+    // A casual game the organiser put on court stays in the queue.
+    expect(matches.find((m) => m.id === 'rr-court')).toMatchObject({ status: 'scheduled' });
 
     const players = await listPlayers('rr');
     const replay = replayElo(players, matches, rr.elo);
@@ -257,8 +256,7 @@ describe('Dexie v3 upgrade of a pre-refactor database', () => {
     expect(de).toMatchObject({ phase: 'casual', format: null, bracket: null });
 
     const matches = await listMatches('de');
-    // Losers and grand-final slots were waiting on feeds that no longer
-    // exist, so nothing could ever complete them; they held no result.
+    // Losers and grand-final slots were unplayed schedule, not results.
     expect(matches.map((m) => m.id)).toEqual(['de-w1']);
     expect(matches[0]).toMatchObject({
       stage: 'casual',
@@ -325,8 +323,8 @@ describe('importBackup of a pre-refactor export', () => {
       JSON.stringify({ format: BACKUP_FORMAT, version: 1, exportedAt: 'x', ...LEGACY }),
     );
     const result = await importBackup(file);
-    // de-l1, de-gf and de-gfr are the unfillable placeholders.
-    expect(result).toEqual({ tournaments: 5, players: 12, matches: LEGACY.matches.length - 3 });
+    // Dropped: rr-2, rr-bye, de-l1, de-gf and de-gfr.
+    expect(result).toEqual({ tournaments: 5, players: 12, matches: LEGACY.matches.length - 5 });
 
     const all = await listTournaments();
     for (const t of all) expectCurrentShape(t);
@@ -334,7 +332,7 @@ describe('importBackup of a pre-refactor export', () => {
     const rr = all.find((t) => t.name === 'rr')!;
     expect(rr).toMatchObject({ phase: 'casual', status: 'open', format: null });
     const matches = await listMatches(rr.id);
-    expect(matches).toHaveLength(4);
+    expect(matches.map((m) => m.status).sort()).toEqual(['done', 'done', 'scheduled']);
     expect(matches.every((m) => m.stage === 'casual')).toBe(true);
     const players = await listPlayers(rr.id);
     expect(players.every((p) => !p.inTournament)).toBe(true);

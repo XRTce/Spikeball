@@ -20,8 +20,6 @@ import {
  * Rows are copied and only the known-dead fields are stripped, rather than
  * rebuilt field by field, so that importing a *current* backup through the
  * same path can never silently drop a field this file does not know about.
- *
- * Every function is idempotent: current-shape data passes through unchanged.
  */
 
 type Row = Record<string, unknown>;
@@ -102,30 +100,13 @@ export interface NormalizeRowOptions {
 }
 
 /**
- * Returns the match in the current shape, or `null` when it should not be
- * kept at all.
- *
- * Every match of a reverted tournament, and any match on a removed stage
- * (`round_robin`, `swiss`, `losers`, `grand_final`, `grand_final_reset`),
- * becomes `casual`. Casual is the only stage that is safe for a match with
- * no bracket around it: `groupRounds`, `scheduleProgress` and the tournament
- * tab all skip casual matches, while a `winners` match outside a running
- * bracket would be drawn as a knockout round, and `MatchCard` has no label
- * for a removed stage. Ratings and standings are unaffected by the remap -
- * `replayElo` and `buildStandings` (unfiltered) never look at `stage` - so a
- * played match keeps counting exactly as before. Feed pointers go, since
- * they only meant something inside the bracket that no longer exists.
- *
- * The one thing dropped is an unplayed placeholder with an empty side (an
- * undecided losers-bracket or grand-final slot): with its feeds gone nothing
- * can ever fill it, so it would sit in the casual list as a card that can be
- * neither played nor, for lack of teams, meaningfully edited. It holds no
- * result. A scheduled match with both teams assigned is kept as a casual
- * game - it may well be the one on court while the app updates.
- *
- * Matches of a tournament that keeps its format and already sit on a
- * current stage are left alone, feeds included, so a live single-elim
- * bracket survives the upgrade untouched.
+ * Returns the match in the current shape, or `null` to drop it. Outside a
+ * running bracket only `casual` is safe: the round tabs skip it, `MatchCard`
+ * has no label for removed stages, and Elo/standings never read the stage,
+ * so a result keeps counting. A reverted tournament keeps its casual games
+ * and its real results; unplayed pairings, placeholders and byes were only
+ * its schedule, and as casual rows would flood the queue with games nobody
+ * set up.
  */
 export function normalizeMatch(raw: Row, options: NormalizeRowOptions): Match | null {
   const next: Row = { ...raw };
@@ -134,12 +115,15 @@ export function normalizeMatch(raw: Row, options: NormalizeRowOptions): Match | 
   next.labelA = raw.labelA ?? null;
   next.labelB = raw.labelB ?? null;
 
+  const wasCasual = raw.stage === 'casual';
   const flatten = options.tournamentReverted || !CURRENT_STAGES.has(raw.stage as string);
-  if (!flatten) return next as unknown as Match;
+  if (!flatten || wasCasual) return next as unknown as Match;
 
   const teamA = (raw.teamA as string[] | undefined) ?? [];
   const teamB = (raw.teamB as string[] | undefined) ?? [];
-  if (raw.status !== 'done' && (teamA.length === 0 || teamB.length === 0)) return null;
+  const bothTeams = teamA.length > 0 && teamB.length > 0;
+  const isResult = raw.status === 'done' && !raw.bye && bothTeams;
+  if (options.tournamentReverted ? !isResult : raw.status !== 'done' && !bothTeams) return null;
 
   return {
     ...next,
