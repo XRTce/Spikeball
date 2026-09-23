@@ -127,6 +127,27 @@
   background: var(--brand-tint);
 }
 
+.pickerTeamA {
+  border-color: var(--brand-500);
+  background: var(--brand-tint);
+}
+
+.pickerTeamB {
+  border-color: var(--accent-500);
+  background: var(--accent-tint);
+}
+
+.pickerTeamBadge {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  vertical-align: middle;
+}
+
 .pickerName {
   flex: 1;
   min-width: 0;

@@ -14,21 +14,22 @@ import {
 } from '../ui';
 import { MatchCard, ResultSheet, teamLabel } from '../components/MatchCard';
 import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
+import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
-import { groupRounds, openMatches, scheduleProgress } from '../domain/schedule';
+import { groupRounds, scheduleProgress } from '../domain/schedule';
 import { eliminationSize } from '../domain/pairing/elimination';
-import { suggestCasualMatch, splitChosenPlayers } from '../domain/pairing/casual';
+import { suggestCasualMatch } from '../domain/pairing/casual';
 import { matchWinProbability } from '../domain/elo';
 import {
   clearMatchResult,
   deleteMatch,
   finishTournament,
-  generateNextSwissRound,
   scheduleCasualMatch,
   setMatchResult,
 } from '../db/repo';
-import type { Match } from '../domain/types';
+import { useTimedModeCountdown } from '../state/timedMode';
+import type { Match, Player } from '../domain/types';
 import css from './PlayScreen.module.css';
 
 const s = strings;
@@ -40,6 +41,8 @@ export function PlayScreen() {
 
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [availableIds, setAvailableIds] = useState<Set<string> | null>(null);
   const [seed, setSeed] = useState(1);
   const [activeRound, setActiveRound] = useState<string | null>(null);
 
@@ -71,43 +74,49 @@ export function PlayScreen() {
   if (isTournament) {
     return (
       <>
-        <TournamentPlay
-          activeRound={activeRound}
-          setActiveRound={setActiveRound}
-          onEnterResult={setResultMatch}
-          onToast={(message) => toast.success(message)}
-        />
+        <TournamentPlay activeRound={activeRound} setActiveRound={setActiveRound} onEnterResult={setResultMatch} />
         {resultSheet}
       </>
     );
   }
 
+  const eligiblePlayers = availableIds
+    ? view.activePlayers.filter((player) => availableIds.has(player.id))
+    : view.activePlayers;
+
   return (
     <>
       <CasualPlay
         seed={seed}
+        eligiblePlayers={eligiblePlayers}
+        filterActive={availableIds !== null}
         onReshuffle={() => setSeed((value) => value + 1)}
         onEnterResult={setResultMatch}
         onOpenPicker={() => setPickerOpen(true)}
+        onOpenAvailability={() => setAvailabilityOpen(true)}
       />
       {resultSheet}
       <PlayerPickerSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        players={view.activePlayers}
+        players={eligiblePlayers}
         ratings={view.ratings}
-        count={view.teamSize * 2}
-        onConfirm={async (ids) => {
-          const planned = splitChosenPlayers(ids, {
-            ratings: view.ratings,
-            fallbackRating: tournament.elo.baseElo,
-            history: view.history,
-            teamSize: view.teamSize,
-          });
-          if (!planned) return;
-          await scheduleCasualMatch(tournament.id, planned.teamA, planned.teamB);
+        teamSize={view.teamSize}
+        onConfirm={async (teamA, teamB) => {
+          await scheduleCasualMatch(tournament.id, teamA, teamB);
           setPickerOpen(false);
           toast.success('Spiel steht auf dem Platz');
+        }}
+      />
+      <AvailablePlayersSheet
+        open={availabilityOpen}
+        onClose={() => setAvailabilityOpen(false)}
+        players={view.activePlayers}
+        ratings={view.ratings}
+        selected={availableIds ?? new Set(view.activePlayers.map((p) => p.id))}
+        onConfirm={(ids) => {
+          setAvailableIds(new Set(ids));
+          setAvailabilityOpen(false);
         }}
       />
     </>
@@ -120,18 +129,25 @@ export function PlayScreen() {
 
 function CasualPlay({
   seed,
+  eligiblePlayers,
+  filterActive,
   onReshuffle,
   onEnterResult,
   onOpenPicker,
+  onOpenAvailability,
 }: {
   seed: number;
+  eligiblePlayers: Player[];
+  filterActive: boolean;
   onReshuffle: () => void;
   onEnterResult: (match: Match) => void;
   onOpenPicker: () => void;
+  onOpenAvailability: () => void;
 }) {
   const view = useTournamentView();
   const tournament = view.tournament!;
   const needed = view.teamSize * 2;
+  const countdown = useTimedModeCountdown(tournament.timedMode);
 
   const onCourt = useMemo(
     () =>
@@ -152,7 +168,9 @@ function CasualPlay({
 
   // Players already on the pitch are not offered for the next match.
   const busy = new Set(onCourt.flatMap((match) => [...match.teamA, ...match.teamB]));
-  const available = view.activePlayers.filter((player) => !busy.has(player.id));
+  const available = eligiblePlayers.filter((player) => !busy.has(player.id));
+
+  const maxPartnerRepeats = tournament.timedMode?.maxPartnerRepeats ?? null;
 
   const suggestion = useMemo(
     () =>
@@ -163,8 +181,9 @@ function CasualPlay({
         history: view.history,
         teamSize: view.teamSize,
         seed,
+        maxPartnerRepeats,
       }),
-    [available, seed, tournament.elo.baseElo, view.history, view.ratings, view.teamSize],
+    [available, maxPartnerRepeats, seed, tournament.elo.baseElo, view.history, view.ratings, view.teamSize],
   );
 
   const probability = suggestion
@@ -185,6 +204,22 @@ function CasualPlay({
       />
       <Screen withTabbar>
         <Stack>
+          {tournament.timedMode && (
+            <Badge tone={countdown?.expired ? 'warn' : 'neutral'} icon="clock">
+              {!tournament.timedMode.timerStartedAt
+                ? s.more.timerNotStarted(tournament.timedMode.freePlayMinutes)
+                : countdown?.expired
+                  ? s.more.timerExpired
+                  : countdown?.label}
+            </Badge>
+          )}
+          {view.players.length > 0 && (
+            <Button variant="secondary" icon="checkCircle" onClick={onOpenAvailability}>
+              {filterActive
+                ? s.play.availableCount(eligiblePlayers.length, view.activePlayers.length)
+                : s.play.availablePlayers}
+            </Button>
+          )}
           {view.players.length === 0 ? (
             <EmptyState
               icon="userPlus"
@@ -318,30 +353,22 @@ function TournamentPlay({
   activeRound,
   setActiveRound,
   onEnterResult,
-  onToast,
 }: {
   activeRound: string | null;
   setActiveRound: (key: string) => void;
   onEnterResult: (match: Match) => void;
-  onToast: (message: string) => void;
 }) {
   const view = useTournamentView();
   const tournament = view.tournament!;
 
-  const groups = useMemo(
-    () => groupRounds(view.matches, tournament.format),
-    [view.matches, tournament.format],
-  );
+  const groups = useMemo(() => groupRounds(view.matches), [view.matches]);
   const progress = useMemo(() => {
     const bracket = tournament.bracket;
-    const expected =
-      bracket && tournament.format
-        ? eliminationSize(bracket.teams.length, tournament.format, tournament.play.thirdPlaceMatch)
-            .matches
-        : undefined;
+    const expected = bracket
+      ? eliminationSize(bracket.teams.length, tournament.play.thirdPlaceMatch).matches
+      : undefined;
     return scheduleProgress(view.matches, expected);
-  }, [tournament.bracket, tournament.format, tournament.play.thirdPlaceMatch, view.matches]);
-  const open = useMemo(() => openMatches(view.tournamentMatches), [view.tournamentMatches]);
+  }, [tournament.bracket, tournament.play.thirdPlaceMatch, view.matches]);
 
   // Default to the first round that still has something to play.
   const fallbackKey =
@@ -352,14 +379,6 @@ function TournamentPlay({
     ? activeRound
     : fallbackKey;
   const current = groups.find((group) => group.key === currentKey);
-
-  const isSwiss = tournament.format === 'swiss';
-  const lastSwissRound = view.tournamentMatches.reduce(
-    (max, match) => (match.stage === 'swiss' ? Math.max(max, match.round) : max),
-    0,
-  );
-  const canGenerateRound =
-    isSwiss && open.length === 0 && lastSwissRound < tournament.play.swissRounds;
 
   const everythingPlayed = progress.total > 0 && progress.played === progress.total;
 
@@ -423,24 +442,6 @@ function TournamentPlay({
                 ))}
               </div>
             </>
-          )}
-
-          {canGenerateRound && (
-            <Button
-              variant="primary"
-              size="lg"
-              icon="plus"
-              block
-              onClick={async () => {
-                const round = await generateNextSwissRound(tournament.id);
-                if (round > 0) {
-                  setActiveRound(`swiss:${round}`);
-                  onToast(`${s.common.round} ${round} erstellt`);
-                }
-              }}
-            >
-              {s.play.nextRound}
-            </Button>
           )}
 
           {everythingPlayed && tournament.status !== 'finished' && (

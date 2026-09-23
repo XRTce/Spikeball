@@ -92,56 +92,30 @@ they have been waiting, then randomly; the first four go on. Teams are then
 formed by `balancedSplit`, so the match is close and partners rotate. This is
 the heuristic social formats such as **Americano** use.
 
-### Round robin — `pairing/roundRobin.ts`
+### Captain's draft — `pairing/draft.ts`
 
-A *whist tournament* schedule for rotating partners:
-
-1. The **circle method** (Berger tables) generates every possible partnership
-   exactly once across `n-1` rounds. An odd field gets a ghost entry whose
-   partner sits out.
-2. Within each round, those partnerships are matched against each other by
-   minimum-cost pairing, weighting rating balance against how often the two
-   sides have already met.
-
-Result: everybody partners everybody exactly once, and opponents repeat as late
-as possible. When the number of pairs in a round is odd, the pair that has sat
-out least takes the bye, which spreads rest time evenly.
-
-Singles collapses to the plain circle method.
-
-### Swiss — `pairing/swiss.ts`
-
-Players are ranked (by rating in round 1, by standings afterwards) and cut into
-consecutive groups of four. Each group is split by the **Mexicano** rule — rank
-1 partners rank 4 against ranks 2 and 3 — which keeps every match close while
-rotating partners continuously. A split that would repeat an existing
-partnership is passed over in favour of one that would not.
-
-Singles falls back to **Monrad** pairing: adjacent ranks meet, sliding down the
-table to avoid a rematch.
-
-Byes go to whoever has sat out least, lowest-ranked first on a tie.
+Turniermodus ends the free-play phase by drafting fixed teams for the bracket:
+the best half of the chosen field ("captains") each pick one partner from the
+worse half ("pool"), strongest captain first. An odd field drops its weakest
+player to keep the split even. The result is a set of fixed 2-player teams,
+handed to the elimination builder below.
 
 ### Elimination — `pairing/elimination.ts`
 
-Knockouts need a stable entity to eliminate, which rotating partners are not. So
-for `single_elim` and `double_elim` the participants are first frozen into
+Knockouts need a stable entity to eliminate, which rotating partners are not.
+Outside of Turniermodus's draft, the participants can also be frozen into
 **fixed teams** by snake pairing (strongest with weakest, and so on inwards),
 the standard way to build evenly matched pairs from a ranked pool. Individual
-Elo keeps updating from every match either way.
+Elo keeps updating from every match either way. Either path seeds its teams the
+same way, by combined rating.
 
 **Seeding** uses the standard bracket order, built by repeatedly mirroring the
 previous round's seed list — `[1,2]` → `[1,4,2,3]` → `[1,8,4,5,2,7,3,6]`. Top
 seeds can only meet in the final, and a field that is not a power of two gives
 the top seeds byes.
 
-**Double elimination** adds an alternating losers bracket: a *minor* round in
-which survivors play each other, then a *major* round in which they meet the
-fresh dropdowns from the winners bracket. A bracket of `2^k` produces `2k-2`
-losers rounds. Dropdowns from odd winners rounds are reversed before placement —
-the usual cross-seeding trick that delays rematches. If the losers-bracket
-finalist wins the grand final, a decider is appended automatically, and removed
-again if that result is later corrected.
+A **third-place match** is only added once there is a real semi-final round -
+at least 4 teams. With fewer teams it is simply not created, even if requested.
 
 ### Bracket resolution
 
@@ -155,8 +129,7 @@ consequences fall out for free:
   discarded instead of being silently mis-attributed.
 
 Byes propagate as walkovers: a match whose opponent slot can never be filled
-resolves to a walkover for the team that is there, all the way down the losers
-bracket.
+resolves to a walkover for the team that is there.
 
 ---
 

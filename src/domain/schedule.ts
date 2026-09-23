@@ -1,5 +1,5 @@
 import { bracketOrder, isBracketStage } from './pairing/elimination';
-import type { Match, MatchStage, TournamentFormat } from './types';
+import type { Match, MatchStage } from './types';
 
 export interface RoundGroup {
   key: string;
@@ -39,10 +39,7 @@ function knockoutName(round: number, totalRounds: number, short: boolean): strin
  * round list is readable without pinch-zooming, and each undecided slot names
  * its source match ("Sieger WB1.2"), so where a team comes from stays explicit.
  */
-export function groupRounds(
-  matches: Match[],
-  format: TournamentFormat | null,
-): RoundGroup[] {
+export function groupRounds(matches: Match[]): RoundGroup[] {
   const relevant = matches.filter((match) => match.stage !== 'casual');
   if (relevant.length === 0) return [];
 
@@ -71,8 +68,8 @@ export function groupRounds(
 
     groups.push({
       key,
-      label: roundLabel(first, format, winnersRounds, false),
-      shortLabel: roundLabel(first, format, winnersRounds, true),
+      label: roundLabel(first, winnersRounds, false),
+      shortLabel: roundLabel(first, winnersRounds, true),
       matches: sorted,
       playable: playable.length,
       played,
@@ -85,20 +82,14 @@ export function groupRounds(
 }
 
 function bucketKey(match: Match): string {
-  if (match.stage === 'grand_final' || match.stage === 'grand_final_reset') return match.stage;
   if (match.stage === 'third_place') return 'third_place';
   return `${match.stage}:${match.round}`;
 }
 
 const STAGE_ORDER: Record<MatchStage, number> = {
   casual: 0,
-  round_robin: 1,
-  swiss: 1,
   winners: 2,
-  losers: 3,
   third_place: 8,
-  grand_final: 9,
-  grand_final_reset: 10,
 };
 
 function sortRank(match: Match): number {
@@ -107,26 +98,12 @@ function sortRank(match: Match): number {
   return stage * 1000 + match.round;
 }
 
-function roundLabel(
-  match: Match,
-  format: TournamentFormat | null,
-  winnersRounds: number,
-  short: boolean,
-): string {
+function roundLabel(match: Match, winnersRounds: number, short: boolean): string {
   switch (match.stage) {
-    case 'grand_final':
-      return 'Finale';
-    case 'grand_final_reset':
-      return short ? 'Entsch.' : 'Entscheidungsspiel';
     case 'third_place':
       return short ? 'Platz 3' : 'Spiel um Platz 3';
     case 'winners':
-      if (format === 'double_elim') {
-        return short ? `WB ${match.round}` : `Gewinnerrunde ${match.round}`;
-      }
       return knockoutName(match.round, winnersRounds, short);
-    case 'losers':
-      return short ? `LB ${match.round}` : `Verliererrunde ${match.round}`;
     default:
       return short ? `R${match.round}` : `Runde ${match.round}`;
   }

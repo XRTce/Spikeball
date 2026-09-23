@@ -14,7 +14,6 @@ import { canvasToBlob, renderShareCard, type ShareCardData } from '../export/sha
 import { canShareFiles, downloadBlob } from '../lib/download';
 import { eloSeries } from '../domain/elo';
 import { bracketResult } from '../domain/pairing/elimination';
-import { isEliminationFormat } from '../domain/types';
 import type { TournamentView } from '../state/useTournament';
 import css from './ExportScreen.module.css';
 
@@ -47,10 +46,10 @@ function buildCardData(view: TournamentView, hexOf: (id: string) => string): Sha
 
   let podium: ShareCardData['podium'] = [];
 
-  if (isEliminationFormat(tournament.format) && tournament.format) {
+  if (tournament.format === 'single_elim') {
     // A knockout is decided on the pitch, so the bracket - not the table -
     // says who finished where.
-    const result = bracketResult(view.tournamentMatches, tournament.format);
+    const result = bracketResult(view.tournamentMatches);
     podium = [
       teamEntry(result.championIds, 1),
       teamEntry(result.runnerUpIds, 2),
