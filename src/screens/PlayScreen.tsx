@@ -30,6 +30,7 @@ import {
   setMatchResult,
 } from '../db/repo';
 import { useTimedModeCountdown } from '../state/timedMode';
+import { useAvailablePlayers } from '../state/availablePlayers';
 import { useGuardedAction } from '../state/useGuardedAction';
 import type { Match, Player } from '../domain/types';
 import css from './PlayScreen.module.css';
@@ -45,7 +46,7 @@ export function PlayScreen() {
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const [availableIds, setAvailableIds] = useState<Set<string> | null>(null);
+  const [availableIds, setAvailableIds] = useAvailablePlayers(tournament.id, view.activePlayers);
   const [seed, setSeed] = useState(1);
   const [activeRound, setActiveRound] = useState<string | null>(null);
 
