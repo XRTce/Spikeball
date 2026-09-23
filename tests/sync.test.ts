@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/db';
 import {
   addPlayer,
@@ -531,6 +531,72 @@ describe('joining, leaving and deleting', () => {
     expect(await db.tournaments.get(tournamentId)).toBeUndefined();
     expect(await db.sync.get(tournamentId)).toBeUndefined();
     expect(env.server.has(tournamentId)).toBe(true); // everyone else still has it
+  });
+
+  it('leaveTournament during a pending backoff retry cancels it and makes no further request', async () => {
+    const { tournamentId } = await seedTournament(1);
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    let fetchCalls = 0;
+    let failing = true;
+    const passthrough = env.server.fetch;
+    configureSync({
+      fetch: async (...args: Parameters<typeof fetch>) => {
+        fetchCalls += 1;
+        if (failing) throw new TypeError('Failed to fetch');
+        return passthrough(...args);
+      },
+    });
+
+    await addPlayer(tournamentId, 'Spieler B');
+    await syncNow(tournamentId); // the push fails, so the engine arms a backoff retry
+    expect(fetchCalls).toBe(1);
+    expect(env.timers.pendingCount()).toBe(1);
+    const retries = env.timers.captured();
+
+    failing = false;
+    fetchCalls = 0;
+    await leaveTournament(tournamentId);
+
+    // Cancelled outright, not merely left to find nothing once it fires.
+    expect(env.timers.pendingCount()).toBe(0);
+
+    // Even if the retry fires anyway, it must not reach the network.
+    for (const retry of retries) retry();
+    await syncNow(tournamentId); // joins the loop the retry started, if any
+    expect(fetchCalls).toBe(0);
+    expect(env.timers.pendingCount()).toBe(0);
+  });
+
+  it('leaveTournament while a request is in flight does not arm a retry once it fails', async () => {
+    const { tournamentId } = await seedTournament(1);
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    let fetchCalls = 0;
+    let rejectInFlight: ((err: unknown) => void) | undefined;
+    configureSync({
+      fetch: () => {
+        fetchCalls += 1;
+        return new Promise<Response>((_resolve, reject) => {
+          rejectInFlight = reject;
+        });
+      },
+    });
+
+    await addPlayer(tournamentId, 'Spieler B');
+    const attempt = syncNow(tournamentId);
+    await vi.waitFor(() => expect(rejectInFlight).toBeDefined());
+
+    await leaveTournament(tournamentId);
+    rejectInFlight!(new TypeError('Failed to fetch'));
+    await attempt;
+
+    expect(env.timers.pendingCount()).toBe(0);
+    env.timers.runAll();
+    await syncNow(tournamentId);
+    expect(fetchCalls).toBe(1);
   });
 
   it('deleteTournamentEverywhere needs the password when one is set', async () => {
