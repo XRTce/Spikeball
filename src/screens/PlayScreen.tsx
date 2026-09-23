@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   AvatarStack,
@@ -157,6 +158,7 @@ function CasualPlay({
 }) {
   const view = useTournamentView();
   const tournament = view.tournament!;
+  const navigate = useNavigate();
   const needed = view.teamSize * 2;
   const countdown = useTimedModeCountdown(tournament.timedMode);
 
@@ -238,7 +240,11 @@ function CasualPlay({
               title={s.play.noPlayers}
               text={s.play.noPlayersText}
               action={
-                <Button variant="primary" icon="userPlus" onClick={onOpenPicker} disabled>
+                <Button
+                  variant="primary"
+                  icon="userPlus"
+                  onClick={() => navigate(`/t/${tournament.id}/players`)}
+                >
                   {s.play.addPlayers}
                 </Button>
               }
