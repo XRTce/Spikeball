@@ -18,6 +18,8 @@ import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import { startDraft, pickPartner, isDraftComplete, type DraftState } from '../domain/pairing/draft';
 import { startDraftedBracket } from '../db/repo';
+import { useGuardedAction } from '../state/useGuardedAction';
+import { isLockedError, useSyncStatus } from '../sync';
 import css from './PlayScreen.module.css';
 
 const s = strings;
@@ -33,6 +35,9 @@ export function DraftScreen() {
   const toast = useToast();
   const colors = usePlayerColors();
   const tournament = view.tournament!;
+  const guard = useGuardedAction(tournament.id);
+  const status = useSyncStatus(tournament.id);
+  const syncLocked = status.isProtected && !status.unlocked;
 
   const ranked = useMemo(
     () =>
@@ -171,28 +176,33 @@ export function DraftScreen() {
             variant="primary"
             size="lg"
             icon="check"
+            iconAfter={syncLocked ? 'lock' : undefined}
             block
             busy={busy}
-            onClick={async () => {
+            onClick={() => {
               setBusy(true);
-              try {
-                await startDraftedBracket({
-                  tournamentId: tournament.id,
-                  teams: draft.teams.map((team) => ({ playerIds: [team.captain, team.partner] })),
-                  thirdPlaceMatch: draft.teams.length >= 4 && thirdPlace,
-                });
-                toast.success(s.draft.created);
-                navigate(`/t/${tournament.id}`);
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : s.errors.generic);
-                setBusy(false);
-              }
+              guard.run(async () => {
+                try {
+                  await startDraftedBracket({
+                    tournamentId: tournament.id,
+                    teams: draft.teams.map((team) => ({ playerIds: [team.captain, team.partner] })),
+                    thirdPlaceMatch: draft.teams.length >= 4 && thirdPlace,
+                  });
+                  toast.success(s.draft.created);
+                  navigate(`/t/${tournament.id}`);
+                } catch (error) {
+                  if (isLockedError(error)) throw error;
+                  toast.error(error instanceof Error ? error.message : s.errors.generic);
+                  setBusy(false);
+                }
+              });
             }}
           >
             {s.draft.bracketCreate}
           </Button>
         </Stack>
       </Screen>
+      {guard.sheet}
     </>
   );
 }
