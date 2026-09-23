@@ -21,7 +21,7 @@ import { cx } from '../lib/cx';
 import { usePlayerColors } from '../state/playerColors';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
-import { buildStandings } from '../domain/standings';
+import { buildStandings, compareByElo } from '../domain/standings';
 import { eloSeries } from '../domain/elo';
 import type { MatchStage } from '../domain/types';
 import css from './TableScreen.module.css';
@@ -50,7 +50,7 @@ export function TableScreen() {
       view.matches,
       view.replay,
       stages ? { stages } : {},
-    );
+    ).sort(compareByElo);
   }, [scope, view.matches, view.players, view.replay]);
 
   const played = standings.reduce((sum, row) => sum + row.played, 0);

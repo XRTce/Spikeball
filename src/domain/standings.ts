@@ -90,6 +90,21 @@ export function compareStandings(a: StandingRow, b: StandingRow): number {
   );
 }
 
+/**
+ * Leaderboard order: current rating first. Players without a match in the
+ * current view sit below everyone who has played, so an untouched start
+ * rating never outranks someone who earned theirs.
+ */
+export function compareByElo(a: StandingRow, b: StandingRow): number {
+  return (
+    Number(b.played > 0) - Number(a.played > 0) ||
+    b.elo - a.elo ||
+    b.wins - a.wins ||
+    b.pointDiff - a.pointDiff ||
+    a.name.localeCompare(b.name, 'de')
+  );
+}
+
 /** Head-to-head record between two players across the given matches. */
 export function headToHead(
   matches: Match[],

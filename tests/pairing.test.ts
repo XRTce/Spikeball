@@ -8,7 +8,7 @@ import {
   pairKey,
   type PlannedMatch,
 } from '../src/domain/pairing/utils';
-import { buildStandings } from '../src/domain/standings';
+import { buildStandings, compareByElo } from '../src/domain/standings';
 import { replayElo } from '../src/domain/elo';
 import { DEFAULT_ELO_SETTINGS } from '../src/domain/types';
 import { makePlayer, playedMatch, plannedToMatch, resetIds, resetSequence } from './helpers';
@@ -223,5 +223,46 @@ describe('buildStandings', () => {
     expect(standings[3]!.playerId).toBe('p4');
     expect(standings[3]!.losses).toBe(2);
     expect(standings[0]!.form).toEqual([true, true]);
+  });
+});
+
+describe('compareByElo', () => {
+  it('orders the leaderboard by rating, not by wins', () => {
+    resetIds();
+    resetSequence();
+    // p5 starts far ahead and wins only once; p1 wins twice from a low start.
+    const players = [
+      makePlayer('p1', 900),
+      makePlayer('p2', 900),
+      makePlayer('p3', 1000),
+      makePlayer('p4', 1000),
+      makePlayer('p5', 1400),
+      makePlayer('p6', 1000),
+    ];
+    const matches = [
+      playedMatch(['p1', 'p2'], ['p3', 'p4'], 21, 15),
+      playedMatch(['p1', 'p3'], ['p2', 'p4'], 21, 17),
+      playedMatch(['p5', 'p4'], ['p2', 'p3'], 21, 12),
+    ];
+    const replay = replayElo(players, matches, DEFAULT_ELO_SETTINGS);
+    const standings = buildStandings(players, matches, replay).sort(compareByElo);
+
+    const played = standings.filter((row) => row.played > 0);
+    for (let i = 1; i < played.length; i += 1) {
+      expect(played[i - 1]!.elo).toBeGreaterThanOrEqual(played[i]!.elo);
+    }
+    expect(standings[0]!.playerId).toBe('p5');
+    expect(standings[0]!.wins).toBeLessThan(standings.find((row) => row.playerId === 'p1')!.wins);
+  });
+
+  it('keeps players without a match below everyone who has played', () => {
+    resetIds();
+    resetSequence();
+    const players = [makePlayer('p1'), makePlayer('p2'), makePlayer('p3'), makePlayer('p4'), makePlayer('p5', 2000)];
+    const matches = [playedMatch(['p1', 'p2'], ['p3', 'p4'], 21, 5)];
+    const replay = replayElo(players, matches, DEFAULT_ELO_SETTINGS);
+    const standings = buildStandings(players, matches, replay).sort(compareByElo);
+
+    expect(standings.at(-1)!.playerId).toBe('p5');
   });
 });
