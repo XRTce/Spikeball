@@ -4,7 +4,7 @@ import { cx } from '../lib/cx';
 import { strings } from '../i18n';
 import { usePlayerColors } from '../state/playerColors';
 import type { Player } from '../domain/types';
-import css from '../screens/PlayScreen.module.css';
+import css from './PlayerGrid.module.css';
 
 type Assignment = 'A' | 'B';
 
@@ -93,7 +93,7 @@ export function PlayerPickerSheet({
               aria-pressed={assignment !== undefined}
               className={cx(
                 css.pickerItem,
-                assignment === 'A' && css.pickerTeamA,
+                assignment === 'A' && css.pickerSelected,
                 assignment === 'B' && css.pickerTeamB,
               )}
               onClick={() => cycle(player.id)}

@@ -20,7 +20,7 @@ import { startDraft, pickPartner, isDraftComplete, type DraftState } from '../do
 import { startDraftedBracket } from '../db/repo';
 import { useGuardedAction } from '../state/useGuardedAction';
 import { isLockedError, useSyncStatus } from '../sync';
-import css from './PlayScreen.module.css';
+import css from '../components/PlayerGrid.module.css';
 
 const s = strings;
 
@@ -106,8 +106,8 @@ export function DraftScreen() {
         <Screen>
           <Stack>
             <Card padded>
-              <div className={css.suggestionHead}>
-                <span className={css.suggestionTitle}>{s.draft.captainPicks(nameOf(captain))}</span>
+              <div className={css.pickerHead}>
+                <span className={css.pickerTitle}>{s.draft.captainPicks(nameOf(captain))}</span>
                 <Badge tone="brand">{eloOf(captain)}</Badge>
               </div>
             </Card>
