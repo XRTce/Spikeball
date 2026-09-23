@@ -102,6 +102,9 @@ export async function importBackup(file: BackupFile): Promise<ImportResult> {
     ...tournament,
     id: tournamentIds.get(tournament.id)!,
     updatedAt: now,
+    // Remapped ids make every import a new tournament that no server knows,
+    // and backups written before sync existed carry no visibility at all.
+    visibility: 'local',
     clonedFrom: tournament.clonedFrom
       ? {
           ...tournament.clonedFrom,

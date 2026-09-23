@@ -81,6 +81,10 @@ export async function createTournament(input: CreateTournamentInput): Promise<st
           timerStartedAt: null,
         }
       : null,
+    // Every tournament starts on this device; publishTournament() in src/sync
+    // is the one way to make it public, so a public tournament always has the
+    // sync bookkeeping that goes with it.
+    visibility: 'local',
   };
 
   await db.transaction('rw', db.tournaments, db.players, async () => {

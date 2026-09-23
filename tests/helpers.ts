@@ -132,6 +132,7 @@ export function makeTournament(overrides: Partial<Tournament> = {}): Tournament 
     startedAt: null,
     finishedAt: null,
     timedMode: null,
+    visibility: 'local',
     ...overrides,
   };
 }
