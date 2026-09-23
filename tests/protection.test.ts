@@ -120,10 +120,14 @@ describe('everyday actions need no password', () => {
     // 16 players = 8 teams: quarter-finals, semi-finals, final.
     const { tournamentId, playerIds } = await seed(16);
     await startDraftedBracket({ tournamentId, teams: pairs(playerIds), thirdPlaceMatch: false });
-    const first = await playOne(tournamentId);
-    await playOne(tournamentId);
-    await playOne(tournamentId);
-    await playOne(tournamentId);
+    // Play the four quarter-finals explicitly: "first open match" follows
+    // random ids and could pick a semi-final as soon as one is filled.
+    const quarters = (await listMatches(tournamentId))
+      .filter((match) => match.round === 1 && !match.bye)
+      .sort((a, b) => a.order - b.order);
+    expect(quarters).toHaveLength(4);
+    for (const quarter of quarters) await setMatchResult(quarter.id, 21, 15);
+    const first = quarters[0]!.id;
 
     // Play the semi-final the first quarter-final's winner went into.
     const quarter = (await listMatches(tournamentId)).find((match) => match.id === first)!;
