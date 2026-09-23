@@ -145,11 +145,7 @@ export function createApp(options: AppOptions): App {
     const idMatch = pathname.match(/^\/api\/tournaments\/([^/]+)$/);
     if (idMatch) {
       const id = idMatch[1]!;
-      // The id doubles as the share secret (see validate.ts), so a
-      // malformed one can never name a real tournament; answering the same
-      // 404 the store would give for an unknown-but-well-shaped id, instead
-      // of the length check create alone used to apply, avoids leaking which
-      // shapes are worth guessing and keeps every route consistent.
+      // Answering the same 404 as an unknown-but-well-shaped id avoids leaking which shapes are worth guessing.
       if (!isValidTournamentId(id)) return sendError(res, 'not_found');
       if (req.method === 'GET') return handleFetch(res, id);
       if (req.method === 'PUT') return handlePush(req, res, id);
@@ -433,16 +429,10 @@ function readPasswordHeader(req: IncomingMessage): string | null {
 }
 
 /**
- * X-Forwarded-For is appended-to, left to right, by every proxy the request
- * passes through: each hop adds the peer address *it* saw to the right end,
- * so the entry nearest the server was written by the proxy directly in front
- * of it. The leftmost entry is whatever the original client sent and is
- * therefore fully attacker-controlled - trusting it (as an earlier version of
- * this function did) let a client bypass the rate limiter by sending a fresh
- * spoofed value on every request. With `hops` trusted proxies, the client's
- * real address is `hops` entries in from the right; if the header has fewer
- * entries than that (a misconfigured or lied-about proxy count) we fall back
- * to the raw socket address rather than trust a value we can't place.
+ * X-Forwarded-For is appended right to left by each proxy hop, so with
+ * `hops` trusted proxies the client's real address is `hops` entries in from
+ * the right - the leftmost entry is client-supplied and untrustworthy. Falls
+ * back to the raw socket address if the header has fewer entries than that.
  */
 function clientKey(req: IncomingMessage, hops: number): string {
   if (hops > 0) {

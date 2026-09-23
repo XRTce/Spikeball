@@ -3,16 +3,10 @@
  * IP + tournament id. No persistence needed: a restart resetting the counters
  * is an acceptable tradeoff for a single small process with no shared state.
  *
- * A key sits in `attempts` until it either succeeds (`clear`), expires
- * (`sweep`, hourly), or `maxKeys` is exceeded, whichever comes first. Without
- * that cap, a flood of requests each carrying a distinct client key (for
- * example many different tournament ids, or - before the rate limiter's key
- * was hardened - many spoofed addresses) would grow this map without bound
- * for up to an hour between sweeps. `maxKeys` bounds it instead: once full,
- * the oldest tracked key is evicted to make room. That is a rare, low-stakes
- * loss (one attacker's failure count resets a little early) traded for a
- * hard memory ceiling; 50,000 keys is a few MB at most, comfortably more
- * than any real deployment of this app sees concurrently.
+ * `maxKeys` bounds memory between hourly `sweep()` calls: once full, the
+ * least recently active key is evicted to make room for a new one. 50,000
+ * keys is a few MB at most, comfortably more than this app's real
+ * deployments see concurrently.
  */
 export class RateLimiter {
   private readonly attempts = new Map<string, { count: number; windowStart: number }>();
