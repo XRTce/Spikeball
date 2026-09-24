@@ -95,3 +95,10 @@
   color: var(--text-muted);
   line-height: var(--leading-normal);
 }
+
+.joinScanError {
+  font-size: var(--text-xs);
+  color: var(--loss-500);
+  line-height: var(--leading-normal);
+  text-align: center;
+}

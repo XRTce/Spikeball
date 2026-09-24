@@ -2,20 +2,21 @@ import { useState } from 'react';
 import { Icon, type IconName } from '../ui';
 import { strings } from '../i18n';
 import { useSyncStatus } from '../sync';
-import { ShareSheet } from './ShareSheet';
 import { UnlockSheet } from './UnlockSheet';
 import css from './SyncBadge.module.css';
 
 const s = strings;
 
 /**
- * Compact sync indicator for the tournament tab bars. Only public
- * tournaments have one; local tournaments render nothing so the app bar
- * looks exactly as it did before.
+ * Compact sync *status* indicator for the tournament tab bars - purely
+ * informational, not a share entry point (that's the dedicated ShareButton
+ * next to it). Only public tournaments have one; local tournaments render
+ * nothing so the app bar looks exactly as it did before. The one action it
+ * keeps is tapping in while locked, which opens the unlock sheet - resolving
+ * a sync error, not sharing.
  */
 export function SyncBadge({ tournamentId }: { tournamentId: string }) {
   const status = useSyncStatus(tournamentId);
-  const [shareOpen, setShareOpen] = useState(false);
   const [unlockOpen, setUnlockOpen] = useState(false);
 
   if (status.visibility !== 'public') return null;
@@ -44,18 +45,31 @@ export function SyncBadge({ tournamentId }: { tournamentId: string }) {
     }
   }
 
+  const content = (
+    <>
+      <Icon name={icon} size={16} className={spinning ? css.spin : undefined} />
+      {label && <span className={css.label}>{label}</span>}
+    </>
+  );
+
+  if (!locked) {
+    return (
+      <span className={css.badge} role="status" aria-label={label ?? undefined}>
+        {content}
+      </span>
+    );
+  }
+
   return (
     <>
       <button
         type="button"
         className={css.badge}
-        onClick={() => (locked ? setUnlockOpen(true) : setShareOpen(true))}
-        aria-label={label ?? s.share.title}
+        onClick={() => setUnlockOpen(true)}
+        aria-label={label ?? s.sync.badgeLocked}
       >
-        <Icon name={icon} size={16} className={spinning ? css.spin : undefined} />
-        {label && <span className={css.label}>{label}</span>}
+        {content}
       </button>
-      <ShareSheet tournamentId={tournamentId} open={shareOpen} onClose={() => setShareOpen(false)} />
       <UnlockSheet
         open={unlockOpen}
         tournamentId={tournamentId}

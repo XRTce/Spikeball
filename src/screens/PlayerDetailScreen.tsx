@@ -128,20 +128,28 @@ export function PlayerDetailScreen() {
               <div className={css.relations}>
                 {partners.map(({ other, asPartners, asOpponents }) => (
                   <div key={other.id} className={css.relationRow}>
-                    <Avatar name={other.name} seed={other.id} size={28} color={colors.varOf(other.id)} />
-                    <span className={css.relationName}>{other.name}</span>
-                    <span className={css.relationMeta}>
+                    <div className={css.relationHeader}>
+                      <Avatar name={other.name} seed={other.id} size={28} color={colors.varOf(other.id)} />
+                      <span className={css.relationName}>{other.name}</span>
+                    </div>
+                    <div className={css.relationStats}>
                       {asOpponents[0] + asOpponents[1] > 0 && (
-                        <span>
-                          gegen {asOpponents[0]}:{asOpponents[1]}
-                        </span>
+                        <div className={css.relationStat}>
+                          <div className={css.relationStatValue}>
+                            {s.table.headToHeadOpponentsRecord(asOpponents[0], asOpponents[1])}
+                          </div>
+                          <div className={css.relationStatLabel}>{s.table.headToHeadOpponentsCaption}</div>
+                        </div>
                       )}
                       {asPartners.played > 0 && (
-                        <span>
-                          mit {asPartners.wins}/{asPartners.played}
-                        </span>
+                        <div className={css.relationStat}>
+                          <div className={css.relationStatValue}>
+                            {s.table.headToHeadPartnersRecord(asPartners.wins, asPartners.played)}
+                          </div>
+                          <div className={css.relationStatLabel}>{s.table.headToHeadPartnersCaption}</div>
+                        </div>
                       )}
-                    </span>
+                    </div>
                   </div>
                 ))}
               </div>

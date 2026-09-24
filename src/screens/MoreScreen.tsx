@@ -17,7 +17,10 @@ import {
 } from '../ui';
 import { ShareSheet } from '../components/ShareSheet';
 import { UnlockSheet } from '../components/UnlockSheet';
+import { PublishSheet } from '../components/PublishSheet';
 import { SyncBadge } from '../components/SyncBadge';
+import { CountdownCard } from '../components/CountdownCard';
+import { ShareButton } from '../components/ShareButton';
 import { strings, formatRelative } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import {
@@ -36,7 +39,6 @@ import {
   isLockedError,
   leaveTournament,
   lockTournament,
-  publishTournament,
   syncNow,
   useServerAvailable,
   useSyncStatus,
@@ -45,8 +47,6 @@ import { useGuardedAction } from '../state/useGuardedAction';
 import { useTimedModeCountdown } from '../state/timedMode';
 import { MIN_DRAFT_PLAYERS } from '../domain/pairing/draft';
 import form from '../styles/forms.module.css';
-import { cx } from '../lib/cx';
-import css from './MoreScreen.module.css';
 
 const s = strings;
 
@@ -85,7 +85,12 @@ export function MoreScreen() {
         title={s.more.title}
         subtitle={tournament.name}
         back={`/t/${tournament.id}`}
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>
@@ -159,7 +164,16 @@ export function MoreScreen() {
                       icon="trophy"
                       iconAfter={syncLocked ? 'lock' : undefined}
                       block
-                      onClick={() => guard.run(() => finishTournament(tournament.id))}
+                      onClick={() =>
+                        guard.run(async () => {
+                          await finishTournament(tournament.id);
+                          // Same results screen the automatic finish (from
+                          // entering the last score in Play) leads to, just
+                          // without replaying its confetti for this
+                          // deliberate admin action.
+                          navigate(`/t/${tournament.id}/finished`);
+                        })
+                      }
                     >
                       {s.play.finish}
                     </Button>
@@ -176,29 +190,21 @@ export function MoreScreen() {
                 </Stack>
               ) : timedMode ? (
                 <Stack>
-                  {!timedMode.timerStartedAt ? (
-                    <>
-                      <p className={form.hint}>{s.more.timerNotStarted(timedMode.freePlayMinutes)}</p>
-                      <Button
-                        variant="primary"
-                        size="lg"
-                        icon="play"
-                        iconAfter={syncLocked ? 'lock' : undefined}
-                        block
-                        onClick={() => guard.run(() => startFreePlayTimer(tournament.id))}
-                      >
-                        {s.more.timerStart}
-                      </Button>
-                    </>
-                  ) : (
-                    <div className={cx(css.timerCard, countdown?.expired && css.timerCardExpired)}>
-                      <span className={css.timerValue}>
-                        {countdown?.expired ? s.more.timerExpired : countdown?.label}
-                      </span>
-                      {!countdown?.expired && (
-                        <span className={css.timerCaption}>{s.more.timerRemaining}</span>
-                      )}
-                    </div>
+                  <CountdownCard
+                    countdown={countdown}
+                    notStartedLabel={s.more.timerNotStarted(timedMode.freePlayMinutes)}
+                  />
+                  {!timedMode.timerStartedAt && (
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      icon="play"
+                      iconAfter={syncLocked ? 'lock' : undefined}
+                      block
+                      onClick={() => guard.run(() => startFreePlayTimer(tournament.id))}
+                    >
+                      {s.more.timerStart}
+                    </Button>
                   )}
                   <Button
                     variant={countdown?.expired ? 'primary' : 'secondary'}
@@ -521,73 +527,6 @@ export function MoreScreen() {
       />
       {guard.sheet}
     </>
-  );
-}
-
-function PublishSheet({
-  open,
-  tournamentId,
-  onClose,
-  onPublished,
-}: {
-  open: boolean;
-  tournamentId: string;
-  onClose: () => void;
-  onPublished: () => void;
-}) {
-  const toast = useToast();
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const passwordError =
-    password.length > 0 && password.length < LIMITS.passwordMin
-      ? s.create.passwordTooShort(LIMITS.passwordMin)
-      : undefined;
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title={s.sync.more.publishAction}
-      subtitle={s.sync.more.publishHint}
-      actions={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {s.common.cancel}
-          </Button>
-          <Button
-            variant="primary"
-            icon="qr"
-            busy={busy}
-            disabled={!!passwordError}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await publishTournament(tournamentId, password || null);
-                setPassword('');
-                onPublished();
-              } catch (error) {
-                console.error(error);
-                toast.error(s.errors.generic);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {s.sync.more.publishAction}
-          </Button>
-        </>
-      }
-    >
-      <TextField
-        label={s.create.password}
-        type="password"
-        value={password}
-        onChange={(event) => setPassword(event.currentTarget.value)}
-        autoComplete="new-password"
-        error={passwordError}
-      />
-      <p className={form.hint}>{s.create.passwordHint}</p>
-    </Sheet>
   );
 }
 
