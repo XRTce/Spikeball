@@ -17,6 +17,7 @@ import { MatchCard, ResultSheet, teamLabel } from '../components/MatchCard';
 import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
 import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
 import { SyncBadge } from '../components/SyncBadge';
+import { CountdownCard } from '../components/CountdownCard';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import { groupRounds, scheduleProgress } from '../domain/schedule';
@@ -219,13 +220,10 @@ function CasualPlay({
       <Screen withTabbar>
         <Stack>
           {tournament.timedMode && (
-            <Badge tone={countdown?.expired ? 'warn' : 'neutral'} icon="clock">
-              {!tournament.timedMode.timerStartedAt
-                ? s.more.timerNotStarted(tournament.timedMode.freePlayMinutes)
-                : countdown?.expired
-                  ? s.more.timerExpired
-                  : countdown?.label}
-            </Badge>
+            <CountdownCard
+              countdown={countdown}
+              notStartedLabel={s.more.timerNotStarted(tournament.timedMode.freePlayMinutes)}
+            />
           )}
           {view.players.length > 0 && (
             <Button variant="secondary" icon="checkCircle" onClick={onOpenAvailability}>

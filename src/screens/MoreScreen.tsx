@@ -18,6 +18,7 @@ import {
 import { ShareSheet } from '../components/ShareSheet';
 import { UnlockSheet } from '../components/UnlockSheet';
 import { SyncBadge } from '../components/SyncBadge';
+import { CountdownCard } from '../components/CountdownCard';
 import { strings, formatRelative } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import {
@@ -45,8 +46,6 @@ import { useGuardedAction } from '../state/useGuardedAction';
 import { useTimedModeCountdown } from '../state/timedMode';
 import { MIN_DRAFT_PLAYERS } from '../domain/pairing/draft';
 import form from '../styles/forms.module.css';
-import { cx } from '../lib/cx';
-import css from './MoreScreen.module.css';
 
 const s = strings;
 
@@ -176,29 +175,21 @@ export function MoreScreen() {
                 </Stack>
               ) : timedMode ? (
                 <Stack>
-                  {!timedMode.timerStartedAt ? (
-                    <>
-                      <p className={form.hint}>{s.more.timerNotStarted(timedMode.freePlayMinutes)}</p>
-                      <Button
-                        variant="primary"
-                        size="lg"
-                        icon="play"
-                        iconAfter={syncLocked ? 'lock' : undefined}
-                        block
-                        onClick={() => guard.run(() => startFreePlayTimer(tournament.id))}
-                      >
-                        {s.more.timerStart}
-                      </Button>
-                    </>
-                  ) : (
-                    <div className={cx(css.timerCard, countdown?.expired && css.timerCardExpired)}>
-                      <span className={css.timerValue}>
-                        {countdown?.expired ? s.more.timerExpired : countdown?.label}
-                      </span>
-                      {!countdown?.expired && (
-                        <span className={css.timerCaption}>{s.more.timerRemaining}</span>
-                      )}
-                    </div>
+                  <CountdownCard
+                    countdown={countdown}
+                    notStartedLabel={s.more.timerNotStarted(timedMode.freePlayMinutes)}
+                  />
+                  {!timedMode.timerStartedAt && (
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      icon="play"
+                      iconAfter={syncLocked ? 'lock' : undefined}
+                      block
+                      onClick={() => guard.run(() => startFreePlayTimer(tournament.id))}
+                    >
+                      {s.more.timerStart}
+                    </Button>
                   )}
                   <Button
                     variant={countdown?.expired ? 'primary' : 'secondary'}
