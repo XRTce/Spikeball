@@ -364,6 +364,8 @@ export const de = {
     join: {
       action: 'Turnier beitreten',
       title: 'Turnier beitreten',
+      modeScan: 'Scannen',
+      modeManual: 'Eingeben',
       inputLabel: 'Link oder Code',
       inputPlaceholder: 'z.B. https://rally.app/t/…',
       inputHint: 'Du kannst auch einfach den QR-Code mit der Kamera scannen.',
@@ -374,6 +376,13 @@ export const de = {
       retry: 'Erneut versuchen',
       offlineText: 'Zum Beitreten wird eine Verbindung benötigt.',
       unavailableText: 'Kein Sync-Server erreichbar.',
+      scanStarting: 'Kamera wird gestartet…',
+      scanHint: 'Richte die Kamera auf den QR-Code des Turniers.',
+      cameraDenied:
+        'Kein Zugriff auf die Kamera. Bitte erlaube den Zugriff in den Einstellungen oder gib den Link manuell ein.',
+      cameraUnavailable: 'Keine Kamera gefunden. Gib den Link stattdessen manuell ein.',
+      cameraUnsupported: 'Dieser Browser unterstützt kein Scannen per Kamera. Gib den Link manuell ein.',
+      cameraError: 'Kamera konnte nicht gestartet werden. Gib den Link stattdessen manuell ein.',
     },
     more: {
       section: 'Teilen',
