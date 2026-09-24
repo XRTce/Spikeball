@@ -12,7 +12,6 @@ import {
 import { cx } from '../lib/cx';
 import { usePlayerColors } from '../state/playerColors';
 import { strings, formatRelative } from '../i18n';
-import { matchWinProbability } from '../domain/elo';
 import { matchCode } from '../domain/pairing/elimination';
 import { useSyncStatus } from '../sync';
 import type { Match, Player, PlaySettings } from '../domain/types';
@@ -83,22 +82,16 @@ export interface MatchCardProps {
   playerById: Map<string, Player>;
   /** Rating changes this match produced, from the Elo replay. */
   deltas?: Record<string, number>;
-  ratings?: Readonly<Record<string, number>>;
-  baseElo?: number;
   onEnterResult?: (match: Match) => void;
   onOpenActions?: (match: Match) => void;
-  showProbability?: boolean;
 }
 
 export function MatchCard({
   match,
   playerById,
   deltas,
-  ratings,
-  baseElo = 1000,
   onEnterResult,
   onOpenActions,
-  showProbability,
 }: MatchCardProps) {
   const colors = usePlayerColors();
   const decided = match.status === 'done' && match.scoreA !== null && match.scoreB !== null;
@@ -126,24 +119,17 @@ export function MatchCard({
     );
   }
 
-  const probability =
-    showProbability && ratings && playable && !decided
-      ? matchWinProbability(match.teamA, match.teamB, ratings, baseElo)
-      : null;
-
   return (
     <div className={css.card}>
       <div className={css.head}>
         <span className={css.stage}>{stageLabel(match)}</span>
         {decided ? (
           <Badge tone="win" icon="check">
-            {s.play.winner}
+            {s.play.matchFinished}
           </Badge>
-        ) : probability !== null ? (
-          <Badge tone={Math.abs(probability - 0.5) < 0.06 ? 'accent' : 'neutral'}>
-            {Math.abs(probability - 0.5) < 0.06
-              ? s.play.even
-              : s.play.favourite(Math.round(Math.max(probability, 1 - probability) * 100))}
+        ) : playable ? (
+          <Badge tone="warn" icon="play">
+            {s.play.matchRunning}
           </Badge>
         ) : null}
       </div>

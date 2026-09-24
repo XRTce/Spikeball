@@ -329,9 +329,6 @@ function CasualPlay({
                     key={match.id}
                     match={match}
                     playerById={view.playerById}
-                    ratings={view.ratings}
-                    baseElo={tournament.elo.baseElo}
-                    showProbability
                     onEnterResult={onEnterResult}
                   />
                 ))}
@@ -453,9 +450,6 @@ function TournamentPlay({
                     match={match}
                     playerById={view.playerById}
                     deltas={view.replay.perMatch[match.id]?.delta}
-                    ratings={view.ratings}
-                    baseElo={tournament.elo.baseElo}
-                    showProbability
                     onEnterResult={onEnterResult}
                   />
                 ))}
