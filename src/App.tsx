@@ -10,6 +10,7 @@ import { MoreScreen } from './screens/MoreScreen';
 import { PlayerDetailScreen } from './screens/PlayerDetailScreen';
 import { ExportScreen } from './screens/ExportScreen';
 import { DraftScreen } from './screens/DraftScreen';
+import { TournamentFinishedScreen } from './screens/TournamentFinishedScreen';
 import { NotFoundScreen } from './screens/NotFoundScreen';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { SyncNotices } from './components/SyncNotices';
@@ -33,6 +34,7 @@ export function App() {
           <Route path="player/:playerId" element={<PlayerDetailScreen />} />
           <Route path="export" element={<ExportScreen />} />
           <Route path="draft" element={<DraftScreen />} />
+          <Route path="finished" element={<TournamentFinishedScreen />} />
         </Route>
         <Route path="*" element={<NotFoundScreen />} />
       </Routes>

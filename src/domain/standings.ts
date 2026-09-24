@@ -1,5 +1,6 @@
 import { isRatedMatch, compareMatchOrder, type EloReplay } from './elo';
-import type { Match, Player, StandingRow } from './types';
+import { bracketResult } from './pairing/elimination';
+import type { Match, Player, StandingRow, TournamentFormat } from './types';
 
 export interface StandingsOptions {
   /** Restrict the table to these player ids (e.g. tournament participants). */
@@ -154,4 +155,45 @@ export function podiumFromStandings(standings: StandingRow[]): Podium {
     second: standings[1] ?? null,
     third: standings[2] ?? null,
   };
+}
+
+export interface FinalPodiumEntry {
+  rank: 1 | 2 | 3;
+  /** A knockout podium entry is a whole team; a table-based one is one player. */
+  playerIds: string[];
+}
+
+/**
+ * The final top three as player-id groups, resolved the same way for every
+ * screen that shows a podium (the export share card, the tournament-finished
+ * screen).
+ *
+ * A knockout is decided on the pitch, so its podium is read out of the
+ * bracket rather than the table; every other format - and a knockout that
+ * has not produced a result yet - falls back to standings order.
+ */
+export function resolveFinalPodium(
+  format: TournamentFormat | null,
+  bracketMatches: Match[],
+  standings: StandingRow[],
+): FinalPodiumEntry[] {
+  if (format === 'single_elim') {
+    const result = bracketResult(bracketMatches);
+    const fromBracket: FinalPodiumEntry[] = [];
+    if (result.championIds && result.championIds.length > 0) {
+      fromBracket.push({ rank: 1, playerIds: result.championIds });
+    }
+    if (result.runnerUpIds && result.runnerUpIds.length > 0) {
+      fromBracket.push({ rank: 2, playerIds: result.runnerUpIds });
+    }
+    if (result.thirdIds && result.thirdIds.length > 0) {
+      fromBracket.push({ rank: 3, playerIds: result.thirdIds });
+    }
+    if (fromBracket.length > 0) return fromBracket;
+  }
+
+  return standings
+    .filter((row) => row.played > 0)
+    .slice(0, 3)
+    .map((row, index) => ({ rank: (index + 1) as 1 | 2 | 3, playerIds: [row.playerId] }));
 }

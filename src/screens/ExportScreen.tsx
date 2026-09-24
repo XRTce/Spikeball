@@ -13,7 +13,7 @@ import { useTournamentView } from './TournamentLayout';
 import { canvasToBlob, renderShareCard, type ShareCardData } from '../export/shareCard';
 import { canShareFiles, downloadBlob } from '../lib/download';
 import { eloSeries } from '../domain/elo';
-import { bracketResult } from '../domain/pairing/elimination';
+import { resolveFinalPodium } from '../domain/standings';
 import type { TournamentView } from '../state/useTournament';
 import css from './ExportScreen.module.css';
 
@@ -29,43 +29,26 @@ function buildCardData(view: TournamentView, hexOf: (id: string) => string): Sha
   const nameOf = (ids: string[]) =>
     ids.map((id) => view.playerById.get(id)?.name ?? '?').join(' & ');
 
-  const teamEntry = (ids: string[] | null, rank: 1 | 2 | 3) => {
-    if (!ids || ids.length === 0) return null;
-    const ratings = ids.map((id) => view.ratings[id] ?? 0);
-    const bases = ids.map((id) => view.playerById.get(id)?.baseElo ?? 0);
-    const mean = (values: number[]) =>
-      Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+  const mean = (values: number[]) =>
+    Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+
+  // A knockout is decided on the pitch, so the bracket - not the table -
+  // says who finished where; every other format falls back to the table.
+  const podium: ShareCardData['podium'] = resolveFinalPodium(
+    tournament.format,
+    view.tournamentMatches,
+    view.standings,
+  ).map(({ rank, playerIds }) => {
+    const ratings = playerIds.map((id) => view.ratings[id] ?? 0);
+    const bases = playerIds.map((id) => view.playerById.get(id)?.baseElo ?? 0);
     return {
       rank,
-      name: nameOf(ids),
+      name: nameOf(playerIds),
       elo: mean(ratings),
       delta: mean(ratings) - mean(bases),
-      color: hexOf(ids[0]!),
+      color: hexOf(playerIds[0]!),
     };
-  };
-
-  let podium: ShareCardData['podium'] = [];
-
-  if (tournament.format === 'single_elim') {
-    // A knockout is decided on the pitch, so the bracket - not the table -
-    // says who finished where.
-    const result = bracketResult(view.tournamentMatches);
-    podium = [
-      teamEntry(result.championIds, 1),
-      teamEntry(result.runnerUpIds, 2),
-      teamEntry(result.thirdIds, 3),
-    ].filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-  }
-
-  if (podium.length === 0) {
-    podium = played.slice(0, 3).map((row, index) => ({
-      rank: (index + 1) as 1 | 2 | 3,
-      name: row.name,
-      elo: row.elo,
-      delta: row.eloChange,
-      color: hexOf(row.playerId),
-    }));
-  }
+  });
 
   const chartRows = played.slice(0, MAX_SERIES);
   const curves = eloSeries(
