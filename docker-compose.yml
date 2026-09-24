@@ -3,7 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rally-roundnet:latest
+    # ghcr.io/xrtce/spikeball on the deploy server (see .github/workflows/deploy.yml),
+    # or the local build's tag when run with `docker compose up -d --build`.
+    image: ghcr.io/xrtce/spikeball:latest
     container_name: rally
     restart: unless-stopped
     # Change the host port if 8080 is taken; the container always listens on 8080.

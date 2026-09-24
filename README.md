@@ -126,6 +126,35 @@ Relevante Umgebungsvariablen (siehe auch [`docs/SYNC.md`](docs/SYNC.md)):
 > meisten Browsern dauerhaften Speicher zugesagt; der Status steht in den
 > Einstellungen.
 
+#### Automatisches Deployment auf einen eigenen Server
+
+`.github/workflows/deploy.yml` baut das Docker-Image bei jedem Push, pusht es
+nach GHCR (`ghcr.io/xrtce/spikeball`) und aktualisiert per SSH den
+`docker compose`-Stack auf einem eigenen Server &mdash; inklusive Sync-Server, im
+Gegensatz zu GitHub Pages. GitHub Pages läuft parallel weiter als kostenlose,
+rein lokale Instanz.
+
+Voraussetzungen auf dem Server: Docker (mit dem Compose-Plugin), ein
+Reverse-Proxy mit TLS vor Port 8080 (nicht Teil dieses Workflows) und einmalig
+von Hand angelegt: das Zielverzeichnis mit einer `.env`
+(siehe [`.env.example`](.env.example), z. B. `RALLY_CORS_ORIGIN`, falls Pages
+und Server parallel laufen).
+
+Einmalig als Repository-Secrets nötig (*Settings &rarr; Secrets and variables
+&rarr; Actions*):
+
+| Secret | Bedeutung |
+|---|---|
+| `DEPLOY_HOST` | Hostname/IP des Servers |
+| `DEPLOY_USER` | SSH-Benutzer (muss `docker compose` ausführen dürfen) |
+| `DEPLOY_SSH_KEY` | Privater Schlüssel; der öffentliche Teil steht in `~/.ssh/authorized_keys` des Nutzers |
+| `DEPLOY_PATH` | Zielverzeichnis auf dem Server für `docker-compose.yml` und `.env` |
+| `DEPLOY_PORT` | Optional, SSH-Port, Default `22` |
+| `GHCR_DEPLOY_TOKEN` | Classic PAT mit `read:packages`, mit dem der Server das (private) GHCR-Image zieht |
+
+`GITHUB_TOKEN` für den Push nach GHCR braucht kein eigenes Secret &mdash; der
+Workflow nutzt den eingebauten Token mit `permissions: packages: write`.
+
 ## Bedienung in 60 Sekunden
 
 1. **Turnier anlegen.** Name, Start-Elo, Liga- oder Turniermodus. Optional
