@@ -51,14 +51,19 @@
 }
 
 .relationRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
 }
 
 .relationRow + .relationRow { border-top: 1px solid var(--border); }
+
+.relationHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
 
 .relationName {
   min-width: 0;
@@ -69,13 +74,31 @@
   white-space: nowrap;
 }
 
-.relationMeta {
+.relationStats {
   display: flex;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-left: calc(28px + var(--space-3));
+}
+
+.relationStat {
+  display: grid;
+  gap: 2px;
+}
+
+.relationStatValue {
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  color: var(--text);
+}
+
+.relationStatLabel {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-subtle);
+  font-weight: var(--weight-medium);
 }
 
 .matchList { display: grid; gap: var(--space-3); }
