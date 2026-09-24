@@ -106,6 +106,43 @@ IndexedDB is not guaranteed to survive. The app therefore:
 - offers a full JSON export/import. Imports always land as **new** tournaments
   with fresh ids, so an import can never overwrite what is already on the device.
 
+### Migrating pre-single-elim data
+
+Early builds had four formats (round robin, Swiss, single and double elim),
+singles/doubles as a `matchFormat`, and a few more play settings. The refactor
+down to single-elim shipped without a migration, so that data is still on
+devices and in old backups. Dexie `version(3)` in `db/db.ts` upgrades it on
+open, and `importBackup` runs the same rules from `db/normalize.ts`:
+
+- **Removed fields go, new ones are filled in.** `matchFormat`,
+  `play.swissRounds`, `play.grandFinalReset` and the never-read
+  `play.participantLimit` are stripped; `timedMode` becomes `null`
+  (Liga-Modus). Everything else on a row is kept.
+- **A tournament on a removed format goes back to the casual queue**, running
+  or finished: `phase: 'casual'`, `status: 'open'`, `format`/`bracket`/
+  `startedAt`/`finishedAt` cleared and `inTournament` reset, the state
+  `backToCasual` produces.
+- **Results are never lost.** Unlike `backToCasual`, played matches are not
+  deleted: every finished non-bye match with both teams becomes
+  `stage: 'casual'` history, with feeds and slot labels cleared. Casual is the
+  only stage that is safe outside a running bracket: the round tabs skip it,
+  `MatchCard` has no label for the old stages, and Elo replay and the
+  unfiltered standings never look at `stage`, so those results keep counting.
+  Casual games the organiser set up themselves stay as they were. The rest of
+  the generated schedule (unplayed pairings, undecided bracket slots, byes) is
+  dropped: none of it is a result, and turned into casual games it would
+  flood the queue with games nobody put on court.
+- **Single-elim tournaments keep running** with their bracket and feeds as
+  they were; only the field changes above apply.
+- **Old singles (1v1) data is kept as it is.** A team is just an array of
+  player ids everywhere: Elo, standings, `MatchCard` and bracket resolution all
+  handle a one-player team, so those matches keep rating and rendering. New
+  matches are always doubles, and turning a single into a pair would mean
+  making up a partner.
+
+Public tournaments need no migration: they were added after the format
+removal, so no public row can have the old shape.
+
 ## Rendering choices worth knowing
 
 **Charts are hand-written SVG** (`ui/Charts.tsx`). A charting library would have

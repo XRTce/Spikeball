@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { Match, Player, Tournament } from '../domain/types';
 import type { CommandName, SyncErrorCode } from '../sync/protocol';
+import { normalizeMatch, normalizePlayer, normalizeTournament } from './normalize';
 
 export interface MetaRow {
   key: string;
@@ -89,6 +90,47 @@ export class RallyDatabase extends Dexie {
             if (!tournament.visibility) tournament.visibility = 'local';
           }),
       );
+    // The refactor that cut formats down to single-elim shipped without a
+    // migration, so rows from before it are still in the old shape
+    // (docs/ARCHITECTURE.md, "Migrating pre-single-elim data"). The rules
+    // live in normalize.ts because backup import applies the same ones. No
+    // index changes, hence `.stores({})`.
+    this.version(3)
+      .stores({})
+      .upgrade(async (tx) => {
+        const reverted = new Set<string>();
+        // The normalisers return fresh rows; assigning `ref.value` stores that
+        // row as-is, and deleting it removes the record (Dexie's documented
+        // modify() contract).
+        await tx
+          .table('tournaments')
+          .toCollection()
+          .modify((raw: Record<string, unknown>, ref: { value: unknown }) => {
+            const { tournament, reverted: wasReverted } = normalizeTournament(raw);
+            if (wasReverted) reverted.add(tournament.id);
+            ref.value = tournament;
+          });
+
+        await tx
+          .table('matches')
+          .toCollection()
+          .modify((raw: Record<string, unknown>, ref: { value: unknown }) => {
+            const tournamentReverted = reverted.has(raw.tournamentId as string);
+            const match = normalizeMatch(raw, { tournamentReverted });
+            if (match) ref.value = match;
+            else delete (ref as { value?: unknown }).value;
+          });
+
+        if (reverted.size > 0) {
+          await tx
+            .table('players')
+            .where('tournamentId')
+            .anyOf([...reverted])
+            .modify((raw: Record<string, unknown>, ref: { value: unknown }) => {
+              ref.value = normalizePlayer(raw, { tournamentReverted: true });
+            });
+        }
+      });
   }
 }
 
