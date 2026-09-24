@@ -45,6 +45,8 @@ import { useGuardedAction } from '../state/useGuardedAction';
 import { useTimedModeCountdown } from '../state/timedMode';
 import { MIN_DRAFT_PLAYERS } from '../domain/pairing/draft';
 import form from '../styles/forms.module.css';
+import { cx } from '../lib/cx';
+import css from './MoreScreen.module.css';
 
 const s = strings;
 
@@ -189,9 +191,14 @@ export function MoreScreen() {
                       </Button>
                     </>
                   ) : (
-                    <Badge tone={countdown?.expired ? 'warn' : 'neutral'}>
-                      {countdown?.expired ? s.more.timerExpired : countdown?.label}
-                    </Badge>
+                    <div className={cx(css.timerCard, countdown?.expired && css.timerCardExpired)}>
+                      <span className={css.timerValue}>
+                        {countdown?.expired ? s.more.timerExpired : countdown?.label}
+                      </span>
+                      {!countdown?.expired && (
+                        <span className={css.timerCaption}>{s.more.timerRemaining}</span>
+                      )}
+                    </div>
                   )}
                   <Button
                     variant={countdown?.expired ? 'primary' : 'secondary'}
@@ -202,7 +209,7 @@ export function MoreScreen() {
                     disabled={view.activePlayers.length < MIN_DRAFT_PLAYERS}
                     onClick={() => navigate(`/t/${tournament.id}/draft`)}
                   >
-                    {countdown?.expired ? s.more.draftStartExpired : s.more.draftStart}
+                    {s.more.draftStart}
                   </Button>
                 </Stack>
               ) : (

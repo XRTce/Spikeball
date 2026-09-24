@@ -9,6 +9,12 @@ const QUIET_ZONE = 4;
  * contrast to scan even when the app is in dark mode. `encode()` already adds
  * a border, so it is asked for none and the quiet zone is added here instead,
  * keeping the exact size predictable for the plate.
+ *
+ * `colorScheme: 'light'` tells the browser this element is intentionally
+ * light-on-dark-module, not an unstyled light element that forgot to support
+ * dark mode. Without it, browsers/WebViews with an auto-darkening setting for
+ * web content (common on Android) repaint the white plate dark, which turns
+ * the code into light-on-dark and makes it unreadable to most scanners.
  */
 export function QrCode({ value, size = 220 }: { value: string; size?: number }) {
   const { path, modules } = useMemo(() => {
@@ -33,7 +39,7 @@ export function QrCode({ value, size = 220 }: { value: string; size?: number }) 
       role="img"
       aria-label={value}
       shapeRendering="crispEdges"
-      style={{ background: '#fff', borderRadius: 'var(--radius-md)' }}
+      style={{ background: '#fff', borderRadius: 'var(--radius-md)', colorScheme: 'light' }}
     >
       <path d={path} fill="#0b1220" />
     </svg>
