@@ -150,7 +150,7 @@ export function HomeScreen() {
   );
 }
 
-/** Tiny "Oeffentlich" chip with a pending dot, for one tournament row. */
+/** Tiny "Öffentlich" chip with a pending dot, for one tournament row. */
 function PublicBadge({ tournamentId }: { tournamentId: string }) {
   const status = useSyncStatus(tournamentId);
   return (

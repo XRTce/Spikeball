@@ -59,7 +59,7 @@ export function Sheet({ open, onClose, title, subtitle, children, actions }: She
               {title && <div className={css.title}>{title}</div>}
               {subtitle && <div className={css.subtitle}>{subtitle}</div>}
             </div>
-            <Button variant="ghost" icon="close" aria-label="Schliessen" onClick={onClose} />
+            <Button variant="ghost" icon="close" aria-label="Schließen" onClick={onClose} />
           </div>
         )}
         <div className={css.content}>{children}</div>
@@ -85,7 +85,7 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Bestaetigen',
+  confirmLabel = 'Bestätigen',
   cancelLabel = 'Abbrechen',
   destructive,
   onConfirm,

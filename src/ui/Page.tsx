@@ -34,7 +34,7 @@ export function AppBar({
           <Button
             variant="ghost"
             icon="chevronLeft"
-            aria-label="Zurueck"
+            aria-label="Zurück"
             onClick={() => (typeof back === 'string' ? navigate(back) : navigate(-1))}
           />
         )}

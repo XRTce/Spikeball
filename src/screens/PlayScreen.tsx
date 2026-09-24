@@ -245,7 +245,7 @@ function CasualPlay({
           ) : suggestion ? (
             <div className={css.suggestion}>
               <div className={css.suggestionHead}>
-                <span className={css.suggestionTitle}>Naechstes Spiel</span>
+                <span className={css.suggestionTitle}>Nächstes Spiel</span>
                 <Badge tone={Math.abs(probability - 0.5) < 0.06 ? 'accent' : 'neutral'}>
                   {Math.abs(probability - 0.5) < 0.06
                     ? s.play.even

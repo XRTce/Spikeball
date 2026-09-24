@@ -99,7 +99,7 @@ export default defineConfig({
         name: 'Rally - Roundnet Turniere',
         short_name: 'Rally',
         description:
-          'Turniere, Spielergebnisse und Elo-Wertungen fuer Roundnet - offline, ohne Account.',
+          'Turniere, Spielergebnisse und Elo-Wertungen für Roundnet - offline, ohne Account.',
         lang: 'de',
         dir: 'ltr',
         start_url: base,

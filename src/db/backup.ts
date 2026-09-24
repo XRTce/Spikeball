@@ -48,11 +48,11 @@ export function parseBackup(raw: string): BackupFile {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new BackupFormatError('Die Datei ist kein gueltiges JSON.');
+    throw new BackupFormatError('Die Datei ist kein gültiges JSON.');
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new BackupFormatError('Die Datei enthaelt kein Backup.');
+    throw new BackupFormatError('Die Datei enthält kein Backup.');
   }
   const candidate = parsed as Partial<BackupFile>;
   if (candidate.format !== BACKUP_FORMAT) {
