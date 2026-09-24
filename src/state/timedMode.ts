@@ -4,17 +4,23 @@ import type { TimedModeSettings } from '../domain/types';
 export interface Countdown {
   expired: boolean;
   /**
-   * mm:ss, rounded up to the next full second and never below 0:00, so it
-   * reads 0:00 only once the time is actually up.
+   * mm:ss, or h:mm:ss once an hour or more remains (free-play can run up to
+   * 12 hours), rounded up to the next full second and never below 0:00, so
+   * it reads 0:00 only once the time is actually up.
    */
   label: string;
 }
 
 export function formatCountdown(remainingMs: number): Countdown {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return { expired: remainingMs <= 0, label: `${minutes}:${seconds.toString().padStart(2, '0')}` };
+  const label =
+    hours > 0
+      ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      : `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  return { expired: remainingMs <= 0, label };
 }
 
 /**

@@ -10,6 +10,9 @@
   background: #fff;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  /* Keeps the plate white even under a browser/OS setting that auto-darkens
+     web content - see the comment in QrCode.tsx for why this matters. */
+  color-scheme: light;
 }
 
 .link {

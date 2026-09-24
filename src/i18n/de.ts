@@ -210,9 +210,9 @@ export const de = {
     delete: 'Turnier löschen',
     timerNotStarted: (minutes: number) => `${minutes} Min. freies Spiel - noch nicht gestartet`,
     timerStart: 'Zeitlimit starten',
+    timerRemaining: 'Verbleibende Zeit',
     timerExpired: 'Zeit abgelaufen',
     draftStart: 'Draft starten',
-    draftStartExpired: 'Zeit abgelaufen - Draft starten',
     draftConfirmTitle: 'Bracket erstellen?',
     draftConfirmText: (teams: number, spectators: number, replacesBracket: boolean) =>
       [
