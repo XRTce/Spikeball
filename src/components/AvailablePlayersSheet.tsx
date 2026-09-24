@@ -4,7 +4,7 @@ import { cx } from '../lib/cx';
 import { strings } from '../i18n';
 import { usePlayerColors } from '../state/playerColors';
 import type { Player } from '../domain/types';
-import css from '../screens/PlayScreen.module.css';
+import css from './PlayerGrid.module.css';
 
 /**
  * Lets the organiser mark who is actually present right now. The automatic

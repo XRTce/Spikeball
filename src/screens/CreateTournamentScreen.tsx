@@ -287,12 +287,12 @@ export function CreateTournamentScreen() {
                       {
                         value: 'current',
                         label: s.create.cloneCurrent,
-                        text: 'Der Stand am Ende des alten Turniers wird zur neuen Start-Elo.',
+                        text: s.create.cloneCurrentText,
                       },
                       {
                         value: 'base',
                         label: s.create.cloneBase,
-                        text: 'Alle starten wieder mit dem Wert, mit dem sie damals begonnen haben.',
+                        text: s.create.cloneBaseText,
                       },
                     ]}
                   />
@@ -320,7 +320,7 @@ export function CreateTournamentScreen() {
               <>
                 <div className={css.twoUp}>
                   <NumberStepper
-                    label="K-Faktor"
+                    label={s.create.kFactor}
                     value={kFactor}
                     onChange={setKFactor}
                     min={8}
@@ -328,7 +328,7 @@ export function CreateTournamentScreen() {
                     step={2}
                   />
                   <NumberStepper
-                    label="K (neu)"
+                    label={s.create.provisionalK}
                     value={provisionalK}
                     onChange={setProvisionalK}
                     min={8}
@@ -337,16 +337,16 @@ export function CreateTournamentScreen() {
                   />
                 </div>
                 <NumberStepper
-                  label="Spiele bis etabliert"
-                  hint="Bis dahin gilt der höhere K-Faktor"
+                  label={s.create.provisionalMatches}
+                  hint={s.create.provisionalMatchesHint}
                   value={provisionalMatches}
                   onChange={setProvisionalMatches}
                   min={0}
                   max={40}
                 />
                 <NumberStepper
-                  label="Spiel bis"
-                  hint="Zielpunktzahl für die Ergebniseingabe"
+                  label={s.create.pointsToWin}
+                  hint={s.create.pointsToWinHint}
                   value={pointsToWin}
                   onChange={setPointsToWin}
                   min={5}
@@ -355,8 +355,8 @@ export function CreateTournamentScreen() {
                 <Switch
                   checked={useMov}
                   onChange={setUseMov}
-                  label="Deutlichkeit des Siegs einrechnen"
-                  hint="Ein 21:3 zählt mehr als ein 21:19."
+                  label={s.create.marginOfVictory}
+                  hint={s.create.marginOfVictoryHint}
                 />
               </>
             )}

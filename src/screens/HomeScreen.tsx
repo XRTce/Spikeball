@@ -29,14 +29,14 @@ function statusBadge(tournament: Tournament) {
   if (tournament.status === 'finished') {
     return (
       <Badge tone="neutral" icon="trophy">
-        Beendet
+        {s.more.statusFinished}
       </Badge>
     );
   }
   if (tournament.phase === 'tournament') {
     return (
       <Badge tone="brand" icon="bracket">
-        {tournament.format ? s.formats[tournament.format] : 'Turnier'}
+        {tournament.format ? s.formats[tournament.format] : s.play.tournamentTitle}
       </Badge>
     );
   }

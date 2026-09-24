@@ -12,6 +12,7 @@
   letter-spacing: var(--tracking-tight);
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
   border: 1px solid transparent;
   transition:
     transform var(--motion-instant) var(--ease-out),
@@ -121,6 +122,14 @@
 }
 
 .label > svg { flex: none; }
+
+/* A label that does not fit ends in "…" rather than being cut mid-letter.
+   Layouts should still size buttons so their labels fit; this is the net. */
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .hiddenLabel { visibility: hidden; }
 

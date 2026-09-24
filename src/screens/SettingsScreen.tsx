@@ -52,7 +52,7 @@ export function SettingsScreen() {
         new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }),
         backupFileName(),
       );
-      toast.success('Backup gespeichert');
+      toast.success(s.settings.backupSaved);
     } catch (error) {
       console.error(error);
       toast.error(s.errors.generic);
@@ -113,7 +113,7 @@ export function SettingsScreen() {
               }
               action={
                 <Badge tone={storageTone} icon={storage?.mode === 'persistent' ? 'shield' : 'alert'}>
-                  {storage?.mode === 'persistent' ? 'sicher' : 'prüfen'}
+                  {storage?.mode === 'persistent' ? s.settings.storageBadgeSafe : s.settings.storageBadgeCheck}
                 </Badge>
               }
             />
@@ -192,7 +192,7 @@ export function SettingsScreen() {
         onConfirm={async () => {
           setConfirmErase(false);
           await eraseEverything();
-          toast.success('Alle Daten gelöscht');
+          toast.success(s.settings.erased);
         }}
       />
     </Shell>
