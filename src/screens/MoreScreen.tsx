@@ -164,7 +164,16 @@ export function MoreScreen() {
                       icon="trophy"
                       iconAfter={syncLocked ? 'lock' : undefined}
                       block
-                      onClick={() => guard.run(() => finishTournament(tournament.id))}
+                      onClick={() =>
+                        guard.run(async () => {
+                          await finishTournament(tournament.id);
+                          // Same results screen the automatic finish (from
+                          // entering the last score in Play) leads to, just
+                          // without replaying its confetti for this
+                          // deliberate admin action.
+                          navigate(`/t/${tournament.id}/finished`);
+                        })
+                      }
                     >
                       {s.play.finish}
                     </Button>

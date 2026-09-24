@@ -127,6 +127,7 @@ export const de = {
     selectNone: 'Alle abwählen',
     finish: 'Turnier abschließen',
     finished: 'Turnier abgeschlossen',
+    viewResults: 'Ergebnisse ansehen',
     progressOf: (played: number, total: number) => `${played} von ${total} Spielen`,
     result: 'Ergebnis eintragen',
     swap: 'Teams tauschen',
@@ -294,6 +295,12 @@ export const de = {
     first: 'Sieger',
     second: 'Platz 2',
     third: 'Platz 3',
+  },
+  finished: {
+    intro: 'Alle Spiele sind gespielt - hier ist das Ergebnis.',
+    noResults: 'Noch keine Ergebnisse.',
+    viewTable: 'Zur Tabelle',
+    backToPlay: 'Zurück zum Spiel',
   },
   draft: {
     title: 'Team-Draft',
