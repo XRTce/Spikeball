@@ -1,0 +1,46 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  min-width: var(--tap-target);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+
+.badge:hover {
+  background: var(--surface-3);
+}
+
+.badge:active {
+  transform: scale(0.97);
+}
+
+.label {
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spin {
+  animation: rally-badge-spin 1s linear infinite;
+}
+
+@keyframes rally-badge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 1ms;
+  }
+}

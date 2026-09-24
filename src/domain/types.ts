@@ -65,6 +65,12 @@ export interface TimedModeSettings {
   maxPartnerRepeats: number | null;
 }
 
+/**
+ * `local` tournaments exist only in this device's IndexedDB. `public` ones are
+ * mirrored on the sync server and can be opened by anyone holding the link.
+ */
+export type TournamentVisibility = 'local' | 'public';
+
 export interface Tournament {
   id: string;
   name: string;
@@ -81,6 +87,7 @@ export interface Tournament {
   startedAt: number | null;
   finishedAt: number | null;
   timedMode: TimedModeSettings | null;
+  visibility: TournamentVisibility;
 }
 
 export interface Player {

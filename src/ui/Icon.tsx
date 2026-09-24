@@ -189,6 +189,35 @@ const paths = {
       <path d="M13.4 11.5 21 8.8V5.6l-9.5 3.2" />
     </>
   ),
+  cloud: (
+    <path d="M7.5 18.5a4.3 4.3 0 0 1-.6-8.55A5.5 5.5 0 0 1 17.4 9a4 4 0 0 1-.9 9H7.5Z" />
+  ),
+  cloudOff: (
+    <>
+      <path d="M9.5 7.2A5.5 5.5 0 0 1 17.4 9a4 4 0 0 1 1.7 7.6M7 10a4.3 4.3 0 0 0 .6 8.5h8.9" />
+      <path d="M3 3l18 18" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2.2" />
+      <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+    </>
+  ),
+  unlock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2.2" />
+      <path d="M8 11V7.5a4 4 0 0 1 7.4-2" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1" />
+      <path d="M14.5 14.5h2.5v2.5h-2.5zM19 14.5h1.5M14.5 19h1.5M19 19h1.5v1.5" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof paths;

@@ -6,11 +6,16 @@ import { ThemeProvider } from './state/theme';
 import { ToastProvider } from './ui';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { requestPersistentStorage } from './db/db';
+import { startSyncEngine } from './sync';
 import './styles/base.css';
 
 // Ask once, early: an installed PWA is normally granted persistent storage
 // without a prompt, which stops the browser evicting a tournament mid-evening.
 void requestPersistentStorage();
+
+// Flushes queued changes for public tournaments and picks up ones changed
+// elsewhere while this device was closed. See docs/SYNC.md, "Sync loop".
+startSyncEngine();
 
 /**
  * BASE_URL is '/' under Docker and '/Spikeball/' on GitHub Pages. React Router

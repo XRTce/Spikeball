@@ -19,6 +19,8 @@ import { strings } from '../i18n';
 import { createTournament } from '../db/repo';
 import { useTournamentList } from '../state/useTournament';
 import { DEFAULT_ELO_SETTINGS, DEFAULT_PLAY_SETTINGS } from '../domain/types';
+import { LIMITS } from '../sync/protocol';
+import { SyncError, publishTournament, useServerAvailable } from '../sync';
 import css from '../styles/forms.module.css';
 
 const s = strings;
@@ -27,6 +29,14 @@ export function CreateTournamentScreen() {
   const navigate = useNavigate();
   const toast = useToast();
   const existing = useTournamentList() ?? [];
+  const serverAvailable = useServerAvailable();
+
+  const [visibility, setVisibility] = useState<'local' | 'public'>('local');
+  const [password, setPassword] = useState('');
+  const passwordError =
+    password.length > 0 && password.length < LIMITS.passwordMin
+      ? s.create.passwordTooShort(LIMITS.passwordMin)
+      : undefined;
 
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
@@ -71,7 +81,26 @@ export function CreateTournamentScreen() {
               }
             : null,
       });
-      navigate(`/t/${id}`, { replace: true });
+
+      if (visibility === 'public') {
+        try {
+          // Works offline too - the upload is queued and the share sheet
+          // still shows a scannable link, it just says "not uploaded yet".
+          // A SyncError here just means offline/unavailable, which is the
+          // expected queued path, not a failure worth interrupting for.
+          await publishTournament(id, password || null);
+        } catch (error) {
+          if (!(error instanceof SyncError)) {
+            console.error(error);
+            toast.error(s.errors.generic);
+          }
+        }
+      }
+
+      navigate(`/t/${id}`, {
+        replace: true,
+        state: visibility === 'public' ? { openShareSheet: true } : undefined,
+      });
     } catch (error) {
       console.error(error);
       toast.error(s.errors.generic);
@@ -107,6 +136,66 @@ export function CreateTournamentScreen() {
               onChange={(event) => setNote(event.currentTarget.value)}
               maxLength={120}
             />
+          </div>
+
+          <div className={css.group}>
+            <div>
+              <div className={css.groupTitle} style={{ marginBottom: 'var(--space-2)' }}>
+                {s.create.visibility}
+              </div>
+              <Segmented
+                ariaLabel={s.create.visibility}
+                value={visibility}
+                onChange={(value) => {
+                  if (value === 'public' && serverAvailable !== true) return;
+                  setVisibility(value);
+                }}
+                options={[
+                  { value: 'local', label: s.create.visibilityLocal },
+                  {
+                    value: 'public',
+                    label: serverAvailable === null ? (
+                      <>
+                        {s.create.visibilityPublic}
+                        <span className={css.hint}> · {s.create.visibilityCheckingHint}</span>
+                      </>
+                    ) : (
+                      s.create.visibilityPublic
+                    ),
+                  },
+                ]}
+              />
+            </div>
+            <p className={css.hint}>
+              {visibility === 'local' ? s.create.visibilityLocalHint : s.create.visibilityPublicHint}
+            </p>
+            {serverAvailable === false && (
+              <p className={css.hint}>{s.create.visibilityUnavailableHint}</p>
+            )}
+            {visibility === 'public' && (
+              <>
+                <TextField
+                  label={s.create.password}
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  autoComplete="new-password"
+                  error={passwordError}
+                />
+                <p className={css.hint}>
+                  {s.create.passwordHint} {s.create.passwordProtects}{' '}
+                  {[
+                    s.sync.reasons.delete_player,
+                    s.sync.reasons.delete_result,
+                    s.sync.reasons.settings,
+                    s.sync.reasons.start,
+                    s.sync.reasons.bracket,
+                    s.sync.reasons.delete_tournament,
+                  ].join(', ')}
+                  .
+                </p>
+              </>
+            )}
           </div>
 
           <div className={css.group}>
@@ -274,7 +363,15 @@ export function CreateTournamentScreen() {
           </div>
 
           <div className={css.submitRow}>
-            <Button type="submit" variant="primary" size="lg" icon="check" block busy={busy}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              icon="check"
+              block
+              busy={busy}
+              disabled={!!passwordError}
+            >
               {s.create.submit}
             </Button>
           </div>

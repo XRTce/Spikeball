@@ -102,6 +102,9 @@ export async function importBackup(file: BackupFile): Promise<ImportResult> {
     ...tournament,
     id: tournamentIds.get(tournament.id)!,
     updatedAt: now,
+    // Remapped ids make every import a new tournament that no server knows,
+    // and backups written before sync existed carry no visibility at all.
+    visibility: 'local',
     clonedFrom: tournament.clonedFrom
       ? {
           ...tournament.clonedFrom,
@@ -163,10 +166,11 @@ export async function importBackup(file: BackupFile): Promise<ImportResult> {
 
 /** Wipes the database. Only reachable behind an explicit confirmation. */
 export async function eraseEverything(): Promise<void> {
-  await db.transaction('rw', db.tournaments, db.players, db.matches, db.meta, async () => {
+  await db.transaction('rw', db.tournaments, db.players, db.matches, db.meta, db.sync, async () => {
     await db.matches.clear();
     await db.players.clear();
     await db.tournaments.clear();
     await db.meta.clear();
+    await db.sync.clear();
   });
 }

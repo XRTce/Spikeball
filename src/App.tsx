@@ -12,11 +12,13 @@ import { ExportScreen } from './screens/ExportScreen';
 import { DraftScreen } from './screens/DraftScreen';
 import { NotFoundScreen } from './screens/NotFoundScreen';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { SyncNotices } from './components/SyncNotices';
 
 export function App() {
   return (
     <>
       <UpdatePrompt />
+      <SyncNotices />
       <Routes>
         <Route path="/" element={<HomeScreen />} />
         <Route path="/new" element={<CreateTournamentScreen />} />

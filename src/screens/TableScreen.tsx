@@ -17,11 +17,12 @@ import {
   tableClass,
 } from '../ui';
 import { EloLineChart, WinLossChart, type Series } from '../ui/Charts';
+import { SyncBadge } from '../components/SyncBadge';
 import { cx } from '../lib/cx';
 import { usePlayerColors } from '../state/playerColors';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
-import { buildStandings } from '../domain/standings';
+import { buildStandings, compareByElo } from '../domain/standings';
 import { eloSeries } from '../domain/elo';
 import type { MatchStage } from '../domain/types';
 import css from './TableScreen.module.css';
@@ -50,7 +51,7 @@ export function TableScreen() {
       view.matches,
       view.replay,
       stages ? { stages } : {},
-    );
+    ).sort(compareByElo);
   }, [scope, view.matches, view.players, view.replay]);
 
   const played = standings.reduce((sum, row) => sum + row.played, 0);
@@ -78,7 +79,12 @@ export function TableScreen() {
 
   return (
     <>
-      <AppBar title={s.table.title} subtitle={tournament.name} back={`/t/${tournament.id}`} />
+      <AppBar
+        title={s.table.title}
+        subtitle={tournament.name}
+        back={`/t/${tournament.id}`}
+        actions={<SyncBadge tournamentId={tournament.id} />}
+      />
       <Screen withTabbar>
         <Stack>
           {hasTournamentMatches && (
