@@ -8,7 +8,6 @@
     <img src="https://img.shields.io/badge/Bundle-~140%20kB%20gzip-0b1220" alt="Bundle-Größe">
     <img src="https://img.shields.io/badge/Lizenz-MIT-blue" alt="MIT">
   </p>
-  <p><a href="https://xrtce.github.io/Spikeball/"><strong>&rarr; App öffnen</strong></a></p>
 </div>
 
 ---
@@ -50,39 +49,14 @@ npm run dev            # http://localhost:5173
 
 ### Selbst hosten
 
-Rally ist ein Ordner mit statischen Dateien &mdash; jeder Webserver tut es. Zwei
-Wege sind vorbereitet.
-
-#### GitHub Pages
-
-Jeder Push auf den Standard-Branch baut und veröffentlicht die App unter
-[xrtce.github.io/Spikeball](https://xrtce.github.io/Spikeball/)
-(`.github/workflows/pages.yml`).
-
-> **Einmalig nötig:** *Settings &rarr; Pages &rarr; Build and deployment &rarr;
-> Source: **GitHub Actions***. Das Erstellen einer Pages-Site braucht
-> Administrationsrechte, die der Workflow-Token nicht hat &mdash; danach läuft
-> alles automatisch.
-
-Weil ein Projekt-Seite unter `/<repo>/` liegt und nicht im Wurzelverzeichnis,
-setzt der Workflow `BASE_PATH`. Daraus leiten sich Asset-Pfade, Router-Basis,
-Manifest und Service-Worker-Scope ab &mdash; dieselben Quellen bauen also für
-beide Ziele:
+Rally ist ein Ordner mit statischen Dateien &mdash; jeder Webserver tut es.
+Vorbereitet ist Docker; `BASE_PATH` (siehe `vite.config.ts`) erlaubt bei
+Bedarf trotzdem einen Build für eine Unterpfad-Bereitstellung:
 
 ```bash
 npm run build                        # fuer die Wurzel (Docker)
-BASE_PATH=/Spikeball/ npm run build  # fuer eine GitHub-Projektseite
+BASE_PATH=/Spikeball/ npm run build  # fuer eine Bereitstellung unter einem Unterpfad
 ```
-
-GitHub Pages kennt keine SPA-Umschreibung, deshalb legt der Build zusätzlich
-eine `404.html` als Kopie der Startseite ab. Ein direkt geöffneter Link wie
-`/Spikeball/new` kommt damit als HTTP 404 an, zeigt aber die richtige Ansicht;
-sobald der Service Worker aktiv ist, übernimmt der seinen Navigations-Fallback.
-
-Pages liefert nur statische Dateien, es gibt dort also keinen Sync-Server:
-öffentliche Turniere lassen sich auf dieser Instanz nicht anlegen, lokale
-funktionieren unverändert. Ein Build mit `VITE_SYNC_URL=https://dein-server`
-verbindet eine statische Instanz mit einem Sync-Server anderswo.
 
 #### Mit Docker
 
@@ -161,15 +135,17 @@ GitHub-Paketeinstellungen öffentlich stellen, oder auf dem Server einmalig
 
 #### Branch-Konzept
 
-- **`main`** &mdash; aktueller, veröffentlichter Stand. Jeder Push baut und
-  deployt GitHub Pages (`.github/workflows/pages.yml`) und veröffentlicht das
-  Docker-Image als `:latest`.
+- **`main`** &mdash; aktueller, veröffentlichter Stand. Jeder Push
+  veröffentlicht das Docker-Image als `:latest`.
 - **`dev`** &mdash; laufende Entwicklung, bündelt mehrere Änderungen vor dem
-  Merge nach `main`. Baut nur das Docker-Image (als `:dev`), kein
-  Pages-Deploy.
+  Merge nach `main`. Baut das Docker-Image als `:dev`.
 - **`feature/*`, `fix/*`, ...** &mdash; einzelne Änderungen, gegen `dev` oder
   `main` gemergt und danach gelöscht. Jeder Push baut ebenfalls ein Image,
   getaggt mit dem Branch-Namen, praktisch zum Testen vor dem Merge.
+
+Jeder Push, egal auf welchem Branch, läuft außerdem durch
+`.github/workflows/ci.yml` (Typecheck, Unit-Tests, Produktions-Build,
+Docker-Smoke-Test).
 
 ## Bedienung in 60 Sekunden
 
