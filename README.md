@@ -118,7 +118,8 @@ Relevante Umgebungsvariablen (siehe auch [`docs/SYNC.md`](docs/SYNC.md)):
 | `RALLY_STATIC_DIR` | `./dist` | Gebaute PWA; fehlt sie, läuft nur die API |
 | `RALLY_CORS_ORIGIN` | nicht gesetzt | Erlaubter Cross-Origin-App-Ursprung, `*` für alle |
 | `RALLY_RETENTION_DAYS` | `365` | Unveränderte öffentliche Turniere werden nach dieser Zeit gelöscht |
-| `RALLY_TRUST_PROXY` | nicht gesetzt | `1`, wenn ein Reverse Proxy davor steht (liest dann `X-Forwarded-For`) |
+| `RALLY_TRUST_PROXY` | nicht gesetzt (`0`) | Anzahl vertrauenswürdiger Proxy-Hops davor, z. B. `1`; liest dann die rechteste `X-Forwarded-For`-Adresse für das Passwort-Ratelimit. Nur setzen, wenn der Port ausschließlich über diese Proxys erreichbar ist – sonst kann ein Client den Header fälschen und das Ratelimit umgehen. Siehe [`docs/SYNC.md`](docs/SYNC.md) |
+| `RALLY_CONNECT_SRC` | nicht gesetzt | Zusätzliche Origin(s) für `connect-src` in der CSP, falls dieser Server eine mit `VITE_SYNC_URL=https://anderer-server` gebaute PWA ausliefert |
 
 > **Installieren aufs Handy:** Seite im Browser öffnen &rarr; Teilen/Menü &rarr;
 > *Zum Homescreen hinzufügen*. Erst als installierte App bekommt Rally von den

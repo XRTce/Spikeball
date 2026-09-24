@@ -221,3 +221,48 @@ points any static build at a sync server elsewhere; the server then needs
 | `RALLY_STATIC_DIR` | `./dist` | built PWA; unset/missing = API only |
 | `RALLY_CORS_ORIGIN` | unset | allowed cross-origin app origin, `*` for any |
 | `RALLY_RETENTION_DAYS` | `365` | tournaments untouched this long are deleted |
+| `RALLY_TRUST_PROXY` | unset (`0`) | number of trusted reverse-proxy hops in front of the server; see below |
+| `RALLY_CONNECT_SRC` | unset | extra origin(s) added to the static pages' CSP `connect-src`; see below |
+
+### `RALLY_TRUST_PROXY`
+
+The password rate limiter (below) keys its counters on the caller's address.
+Behind a reverse proxy that address is always the proxy's, unless the server
+is told to read it from `X-Forwarded-For` instead - and only the *proxy's own*
+entry in that header is trustworthy, because a client can put anything it
+likes in the header itself.
+
+`RALLY_TRUST_PROXY=1` trusts exactly one hop: the server reads the *rightmost*
+entry of `X-Forwarded-For`, which - for a well-behaved proxy directly in front
+of the server - is the address the proxy itself saw connecting to it, not
+whatever the client claimed further left in the header. A chain of more than
+one trusted proxy (for example a CDN in front of a load balancer) can be
+named as `RALLY_TRUST_PROXY=2`, and so on; the server then reads that many
+entries in from the right.
+
+**Set this only when the port is reachable exclusively through that many
+proxies.** If a client can reach the server directly - the proxy is not the
+only path in, or a misconfigured firewall leaves the port open - it can send
+its own `X-Forwarded-For` and make itself look like any address it likes,
+which defeats the rate limiter entirely (the original point of this option).
+
+Left unset (or `0`), the header is ignored and every request is keyed on the
+raw socket address, which behind a proxy is the *proxy's* address for every
+client. In that configuration the rate limiter's failure budget for wrong
+passwords is effectively shared by everyone behind the proxy: one client
+guessing wrong repeatedly can lock out the whole budget for everyone else on
+the same proxy, until the window (10 minutes) or the process restarts. That
+is safe (no one can bypass the limit) but coarse; setting `RALLY_TRUST_PROXY`
+correctly gives each real client its own budget instead.
+
+### `RALLY_CONNECT_SRC`
+
+The static server's Content-Security-Policy locks `connect-src` to `'self'`,
+which is right when this server both serves the built PWA and answers its own
+API calls. A build made with `VITE_SYNC_URL=https://other-server` points its
+`fetch`/`EventSource` calls at a *different* origin; if that same build is
+then also served from here, the browser blocks those calls unless that other
+origin is also allowed. `RALLY_CONNECT_SRC=https://other-server` adds it to
+the policy. Most deployments don't need this: `VITE_SYNC_URL` is normally
+either unset (same-origin) or used for a static-only build (GitHub Pages) that
+this server never serves.

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp, type App } from '../server/app';
+import { RateLimiter } from '../server/rateLimit';
 import { PASSWORD_HEADER, type ApiErrorBody, type TournamentSnapshot } from '../src/sync/protocol';
 import { makePlayer, makeTournament, playedMatch } from './helpers';
 
@@ -160,6 +161,47 @@ describe('fetch', () => {
     const res = await api(`/api/tournaments/${id}`);
     expect(res.status).toBe(410);
     expect((res.body as ApiErrorBody).error).toBe('deleted');
+  });
+
+  it('404s a malformed id before it ever reaches the store', async () => {
+    const res = await api('/api/tournaments/not-a-uuid');
+    expect(res.status).toBe(404);
+    expect((res.body as ApiErrorBody).error).toBe('not_found');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Id validation applies to every /tournaments/:id route, not just create      */
+/* -------------------------------------------------------------------------- */
+
+describe('malformed tournament id', () => {
+  beforeEach(() => start());
+
+  it('404s PUT, DELETE, unlock, password and events for a non-UUID id', async () => {
+    const badId = 'short';
+    const put = await push(badId, 1, [], snapshotFor(badId));
+    expect(put.status).toBe(404);
+    expect((put.body as ApiErrorBody).error).toBe('not_found');
+
+    const del = await api(`/api/tournaments/${badId}`, { method: 'DELETE' });
+    expect(del.status).toBe(404);
+
+    const unlock = await api(`/api/tournaments/${badId}/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'geheim1' }),
+    });
+    expect(unlock.status).toBe(404);
+
+    const password = await api(`/api/tournaments/${badId}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current: null, next: 'geheim1' }),
+    });
+    expect(password.status).toBe(404);
+
+    const events = await api(`/api/tournaments/${badId}/events`);
+    expect(events.status).toBe(404);
   });
 });
 
@@ -321,6 +363,64 @@ describe('unlock', () => {
       });
     }
     expect(last!.status).toBe(429);
+  });
+
+  async function unlockAttempt(id: string, forwardedFor?: string): Promise<{ status: number }> {
+    return api(`/api/tournaments/${id}/unlock`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(forwardedFor ? { 'X-Forwarded-For': forwardedFor } : {}),
+      },
+      body: JSON.stringify({ password: 'wrong' }),
+    });
+  }
+
+  describe('trusted proxy hops', () => {
+    it('without RALLY_TRUST_PROXY, a spoofed X-Forwarded-For does not even delay the limit', async () => {
+      if (app) await app.close();
+      start(); // trustProxy defaults to 0: the header must be ignored entirely
+      const id = await seedProtected();
+      let last: { status: number } | undefined;
+      // A fresh, distinct spoofed value on every request would defeat a
+      // limiter that trusted it; since it is ignored, all 11 requests share
+      // one key (the real socket address) and the 11th is still blocked.
+      for (let i = 0; i < 11; i += 1) {
+        last = await unlockAttempt(id, `1.2.3.${i}`);
+      }
+      expect(last!.status).toBe(429);
+    });
+
+    it('with one trusted hop, a spoofed leftmost entry cannot bypass the limit', async () => {
+      if (app) await app.close();
+      start({ trustProxy: 1 });
+      const id = await seedProtected();
+      let last: { status: number } | undefined;
+      // The rightmost entry ("9.9.9.9") is the one a real single proxy would
+      // have appended itself; the leftmost is attacker-controlled and
+      // changes on every request, but must not change the rate-limit key.
+      for (let i = 0; i < 11; i += 1) {
+        last = await unlockAttempt(id, `attacker-${i}, 9.9.9.9`);
+      }
+      expect(last!.status).toBe(429);
+    });
+
+    it('with one trusted hop, a different rightmost address is limited on its own budget', async () => {
+      if (app) await app.close();
+      start({ trustProxy: 1 });
+      const id = await seedProtected();
+      // 10 wrong attempts each, from two distinct "real" client addresses:
+      // neither alone crosses the limit of 10, which would fail if both
+      // shared a single key.
+      let lastA: { status: number } | undefined;
+      let lastB: { status: number } | undefined;
+      for (let i = 0; i < 10; i += 1) {
+        lastA = await unlockAttempt(id, 'irrelevant, 1.1.1.1');
+        lastB = await unlockAttempt(id, 'irrelevant, 2.2.2.2');
+      }
+      expect(lastA!.status).toBe(403);
+      expect(lastB!.status).toBe(403);
+    });
   });
 });
 
@@ -570,6 +670,26 @@ describe('static file serving', () => {
   });
 });
 
+describe('static file serving with RALLY_CONNECT_SRC', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'rally-static-connect-src-'));
+    writeFileSync(join(dir, 'index.html'), '<html><body><div id="root"></div></body></html>');
+    start({ staticDir: dir, connectSrc: 'https://other-sync-server.example' });
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('adds the configured origin to connect-src alongside self', async () => {
+    const res = await fetch(`${baseUrl}/`);
+    const csp = res.headers.get('content-security-policy');
+    expect(csp).toContain("connect-src 'self' https://other-sync-server.example");
+  });
+});
+
 /* -------------------------------------------------------------------------- */
 /* CORS                                                                        */
 /* -------------------------------------------------------------------------- */
@@ -590,5 +710,61 @@ describe('CORS', () => {
     start();
     const res = await fetch(`${baseUrl}/api/health`);
     expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* RateLimiter: memory is bounded even without a sweep                         */
+/* -------------------------------------------------------------------------- */
+
+describe('RateLimiter maxKeys', () => {
+  it('evicts the oldest tracked key instead of growing past maxKeys', () => {
+    let now = 0;
+    const limiter = new RateLimiter(10, 10 * 60 * 1000, () => now, 3);
+
+    limiter.recordFailure('a');
+    now += 1;
+    limiter.recordFailure('b');
+    now += 1;
+    limiter.recordFailure('c');
+    // At maxKeys (3). A 4th distinct key must evict the oldest ('a') rather
+    // than let the map grow to 4 entries.
+    now += 1;
+    limiter.recordFailure('d');
+
+    // 'a' was evicted, so its failure history is gone: one fresh failure
+    // does not block it (the limit is 10 in a window).
+    expect(limiter.isBlocked('a')).toBe(false);
+    // 'b', 'c' and 'd' are still tracked (never evicted).
+    for (let i = 0; i < 9; i += 1) limiter.recordFailure('d');
+    expect(limiter.isBlocked('d')).toBe(true);
+  });
+
+  it('evicts by recency, not by original insertion order', () => {
+    let now = 0;
+    const windowMs = 100;
+    const limiter = new RateLimiter(2, windowMs, () => now, 3);
+
+    limiter.recordFailure('a'); // inserted first
+    now += 1;
+    limiter.recordFailure('b');
+    limiter.recordFailure('b'); // 2 failures: blocked
+    now += 1;
+    limiter.recordFailure('c');
+    expect(limiter.isBlocked('b')).toBe(true);
+
+    // 'a's window expires; failing again reopens it and must move it to the
+    // back of the eviction order, even though it was inserted before 'b'.
+    now += windowMs;
+    limiter.recordFailure('a');
+
+    // A 4th distinct key must now evict 'b' (least recently active), not
+    // 'a' (just refreshed) - which is what a plain re-`set` on an existing
+    // key would get wrong, since Map keeps an existing key's position.
+    limiter.recordFailure('d');
+
+    expect(limiter.isBlocked('b')).toBe(false); // evicted: history is gone
+    limiter.recordFailure('a'); // 'a' survived with its reopened window intact
+    expect(limiter.isBlocked('a')).toBe(true); // 2 failures since the reopen
   });
 });

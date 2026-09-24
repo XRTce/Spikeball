@@ -6,7 +6,7 @@
   "description": "Rally - offline-first PWA for organising roundnet (spikeball) tournaments with per-tournament Elo ratings.",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "vite",
