@@ -183,6 +183,11 @@ export const de = {
     scope: 'Zeitraum',
     winRate: 'Siegquote',
     headToHead: 'Bilanz gegen und mit',
+    headToHeadOpponentsCaption: 'Als Gegner',
+    headToHeadOpponentsRecord: (wins: number, losses: number) =>
+      `${wins} ${wins === 1 ? 'Sieg' : 'Siege'}, ${losses} ${losses === 1 ? 'Niederlage' : 'Niederlagen'}`,
+    headToHeadPartnersCaption: 'Als Team',
+    headToHeadPartnersRecord: (wins: number, played: number) => `${wins} von ${played} gewonnen`,
   },
   more: {
     title: 'Mehr',
