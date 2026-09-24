@@ -7,7 +7,7 @@ export interface CasualInput {
   ratings: Readonly<Record<string, number>>;
   fallbackRating: number;
   history: PlayHistory;
-  /** Always 2 - team size for the doubles format. */
+  /** Players per side. Always 2: roundnet is played 2v2. */
   teamSize: number;
   /** Seed for tie-breaking, so "shuffle" produces a different-but-fair match. */
   seed?: number;

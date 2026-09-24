@@ -216,6 +216,18 @@ describe('destructive actions need the password', () => {
     ]);
   });
 
+  it('throwing a Turniermodus bracket away, which also resets the countdown', async () => {
+    const { tournamentId, playerIds } = await seed(4, true);
+    await startFreePlayTimer(tournamentId);
+    await startDraftedBracket({ tournamentId, teams: pairs(playerIds) });
+    // Resetting the timer is a timer change like starting it. The discard
+    // needs the password for 'bracket' anyway, so no new prompt appears.
+    expect(await reasonsFor(tournamentId, () => backToCasual(tournamentId))).toEqual([
+      'bracket',
+      'start',
+    ]);
+  });
+
   it('finishing or reopening by hand', async () => {
     const { tournamentId, playerIds } = await seed(8);
     await startDraftedBracket({ tournamentId, teams: pairs(playerIds) });

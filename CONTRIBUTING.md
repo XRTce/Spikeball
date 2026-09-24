@@ -64,8 +64,8 @@ that way, and [`docs/BRAND.md`](docs/BRAND.md) for the design rules.
 `src/domain/` is where correctness lives, and it is testable without a browser.
 Anything touching Elo or pairing needs a test that would fail without the
 change. Prefer testing a *property* over a fixed expectation where you can — for
-example "in an 8-player round robin every pair partners exactly once" rather
-than a hard-coded schedule.
+example "after a draft every captain has exactly one partner" rather than a
+hard-coded list of teams.
 
 The database layer is tested against `fake-indexeddb` in `tests/repo.test.ts`.
 

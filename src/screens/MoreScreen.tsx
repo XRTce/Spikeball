@@ -43,6 +43,7 @@ import {
 } from '../sync';
 import { useGuardedAction } from '../state/useGuardedAction';
 import { useTimedModeCountdown } from '../state/timedMode';
+import { MIN_DRAFT_PLAYERS } from '../domain/pairing/draft';
 import form from '../styles/forms.module.css';
 
 const s = strings;
@@ -198,7 +199,7 @@ export function MoreScreen() {
                     icon="bracket"
                     iconAfter={syncLocked ? 'lock' : undefined}
                     block
-                    disabled={view.activePlayers.length < 4}
+                    disabled={view.activePlayers.length < MIN_DRAFT_PLAYERS}
                     onClick={() => navigate(`/t/${tournament.id}/draft`)}
                   >
                     {countdown?.expired ? s.more.draftStartExpired : s.more.draftStart}
@@ -404,7 +405,7 @@ export function MoreScreen() {
       <ConfirmDialog
         open={confirmDiscard}
         title={s.more.backToCasualTitle}
-        message={s.more.backToCasualText}
+        message={timedMode ? s.more.backToCasualTimedText : s.more.backToCasualText}
         confirmLabel={s.more.backToCasual}
         destructive
         onCancel={() => setConfirmDiscard(false)}

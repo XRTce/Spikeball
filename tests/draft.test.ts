@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isDraftComplete, pickPartner, startDraft } from '../src/domain/pairing/draft';
+import {
+  MIN_DRAFT_PLAYERS,
+  isDraftComplete,
+  pickPartner,
+  startDraft,
+} from '../src/domain/pairing/draft';
 
 const ids = (count: number) => Array.from({ length: count }, (_, i) => `p${i + 1}`);
 const ratingsFor = (count: number, base = 1000, step = 10) =>
@@ -82,5 +87,34 @@ describe('pickPartner / isDraftComplete', () => {
     const afterFirstPick = state;
     state = pickPartner(state, 'p3'); // already taken
     expect(state).toBe(afterFirstPick);
+  });
+});
+
+describe('draft field size', () => {
+  it.each([0, 1, 2, 3])('refuses %i players instead of producing an empty draft', (count) => {
+    expect(count).toBeLessThan(MIN_DRAFT_PLAYERS);
+    expect(() => startDraft(ids(count), ratingsFor(count), 1000)).toThrow(RangeError);
+  });
+
+  it.each([
+    [4, 2],
+    [5, 2],
+  ])('drafts %i players into %i teams, one pick per captain', (count, teamCount) => {
+    let state = startDraft(ids(count), ratingsFor(count), 1000);
+    expect(state.captains).toHaveLength(teamCount);
+    expect(state.pool).toHaveLength(teamCount);
+
+    let picks = 0;
+    while (!isDraftComplete(state)) {
+      expect(picks).toBeLessThan(teamCount);
+      state = pickPartner(state, state.pool[0]!);
+      picks += 1;
+    }
+    expect(picks).toBe(teamCount);
+    expect(state.teams).toHaveLength(teamCount);
+    // With 5 players the weakest sits out.
+    const drafted = state.teams.flatMap((team) => [team.captain, team.partner]);
+    expect(drafted).toHaveLength(4);
+    if (count === 5) expect(drafted).not.toContain('p5');
   });
 });

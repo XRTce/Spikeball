@@ -64,9 +64,6 @@ function validateEloSettings(value: unknown): string | null {
 function validatePlaySettings(value: unknown): string | null {
   if (!isPlainObject(value)) return 'tournament.play must be an object';
   if (!isFiniteNumber(value.pointsToWin)) return 'tournament.play.pointsToWin must be a number';
-  if (!isNullOr(value.participantLimit, isFiniteNumber)) {
-    return 'tournament.play.participantLimit must be a number or null';
-  }
   if (typeof value.thirdPlaceMatch !== 'boolean') return 'tournament.play.thirdPlaceMatch must be a boolean';
   return null;
 }

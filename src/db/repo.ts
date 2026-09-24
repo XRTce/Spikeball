@@ -413,8 +413,6 @@ export const swapMatchPlayers = command('swapMatchPlayers', matchTournamentId, s
 export interface StartTournamentResult {
   matches: number;
   rounds: number;
-  /** Players that could not be placed in a team (odd field in an elimination). */
-  unassigned: string[];
 }
 
 /** Turns a bracket plan's match drafts into storable matches. */
@@ -515,17 +513,12 @@ async function startDraftedBracketImpl(
       startedAt: Date.now(),
       finishedAt: null,
       updatedAt: Date.now(),
-      play: {
-        ...tournament.play,
-        participantLimit: drafted.size,
-        thirdPlaceMatch,
-      },
+      play: { ...tournament.play, thirdPlaceMatch },
     });
 
     return {
       matches: created.filter((match) => !match.bye).length,
       rounds: new Set(created.map((match) => match.round)).size,
-      unassigned: [] as string[],
     };
   });
 
@@ -548,9 +541,18 @@ async function reopenTournamentImpl(tournamentId: string): Promise<void> {
 }
 export const reopenTournament = command('reopenTournament', (tournamentId) => tournamentId, reopenTournamentImpl);
 
-/** Drops the generated schedule and returns to the open ad-hoc queue. */
+/**
+ * Drops the generated schedule and returns to the open ad-hoc queue.
+ *
+ * In Turniermodus this also resets the countdown: the tournament goes back to
+ * where it was before "Zeitlimit starten", so the organiser can start a fresh
+ * free-play phase (or draft again straight away). Keeping the old start time
+ * would leave the countdown expired for good, and startFreePlayTimer() never
+ * overwrites a running timer.
+ */
 async function backToCasualImpl(tournamentId: string): Promise<void> {
   await db.transaction('rw', db.tournaments, db.players, db.matches, async () => {
+    const tournament = await db.tournaments.get(tournamentId);
     const matches = await db.matches.where('tournamentId').equals(tournamentId).toArray();
     const generated = matches.filter((match) => match.stage !== 'casual');
     if (generated.length > 0) await db.matches.bulkDelete(generated.map((m) => m.id));
@@ -566,6 +568,9 @@ async function backToCasualImpl(tournamentId: string): Promise<void> {
       startedAt: null,
       finishedAt: null,
       updatedAt: Date.now(),
+      ...(tournament?.timedMode && {
+        timedMode: { ...tournament.timedMode, timerStartedAt: null },
+      }),
     });
   });
   await recalculate(tournamentId);

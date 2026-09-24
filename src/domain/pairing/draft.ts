@@ -14,6 +14,12 @@ export interface DraftState {
   teams: { captain: string; partner: string }[];
 }
 
+/**
+ * Two teams are the smallest field a bracket can be built from
+ * (`startDraftedBracket` refuses fewer), so a draft needs four players.
+ */
+export const MIN_DRAFT_PLAYERS = 4;
+
 function rank(
   playerIds: readonly string[],
   ratings: Readonly<Record<string, number>>,
@@ -25,14 +31,23 @@ function rank(
 
 /**
  * Ranks the pool by rating and splits it into captains (best half) and pool
- * (worse half). An odd pool drops its weakest player, the same way an odd
- * elimination field leaves a player unassigned in `buildBracketTeams`.
+ * (worse half). An odd pool drops its weakest player, since every team needs
+ * exactly two.
+ *
+ * Throws for fewer than {@link MIN_DRAFT_PLAYERS} players: a smaller field
+ * would give zero or one team, a draft that is "complete" before anyone picked
+ * and a bracket that cannot be built.
  */
 export function startDraft(
   playerIds: readonly string[],
   ratings: Readonly<Record<string, number>>,
   fallbackRating: number,
 ): DraftState {
+  if (playerIds.length < MIN_DRAFT_PLAYERS) {
+    throw new RangeError(
+      `A draft needs at least ${MIN_DRAFT_PLAYERS} players, got ${playerIds.length}`,
+    );
+  }
   const ranked = rank(playerIds, ratings, fallbackRating);
   const evenCount = ranked.length - (ranked.length % 2);
   const active = ranked.slice(0, evenCount);

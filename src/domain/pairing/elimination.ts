@@ -55,49 +55,9 @@ export function seedOrder(size: number): number[] {
   return seeds;
 }
 
-export interface BuildTeamsInput {
-  playerIds: string[];
-  ratings: Readonly<Record<string, number>>;
-  fallbackRating: number;
-  nameOf: (playerId: string) => string;
-  makeId: () => string;
-}
-
 /**
- * Turns the participant list into the fixed teams that contest an elimination
- * bracket, by snake pairing - highest rated with lowest rated, and so on
- * inwards - the standard way to produce evenly matched pairs from a ranked
- * pool. Teams are then seeded by their combined rating.
- */
-export function buildBracketTeams(input: BuildTeamsInput): {
-  teams: BracketTeam[];
-  unassigned: string[];
-} {
-  const rating = (id: string) => input.ratings[id] ?? input.fallbackRating;
-  const ranked = [...input.playerIds].sort((a, b) => rating(b) - rating(a) || a.localeCompare(b));
-
-  const pairCount = Math.floor(ranked.length / 2);
-  const unassigned = ranked.slice(pairCount * 2);
-  const pairs: string[][] = [];
-  for (let i = 0; i < pairCount; i += 1) {
-    pairs.push([ranked[i]!, ranked[ranked.length - 1 - unassigned.length - i]!]);
-  }
-
-  const teams = seedTeams(
-    pairs.map((playerIds) => ({ playerIds })),
-    input.ratings,
-    input.fallbackRating,
-    input.nameOf,
-    input.makeId,
-  );
-
-  return { teams, unassigned };
-}
-
-/**
- * Turns already-decided pairs into seeded bracket teams, ordered by combined
- * rating (strongest first). Shared by the snake-paired path above and by the
- * timed-mode captain's draft, which hands in pairs it built a different way.
+ * Turns already-decided pairs (from the captain's draft) into seeded bracket
+ * teams, ordered by combined rating, strongest first.
  */
 export function seedTeams(
   pairs: readonly { playerIds: string[] }[],
@@ -230,9 +190,17 @@ export interface BracketOptions {
 }
 
 /**
- * Builds a seeded single-elimination bracket. A third-place match is only
- * meaningful once there is a real semi-final round (at least 4 teams); with
- * fewer teams `semis` is undefined and the match is simply not created.
+ * A third-place match needs two real semi-final losers, so at least 4 teams.
+ * With 3 teams one semi-final is a walkover, and the "match" for third would
+ * be a walkover too.
+ */
+export function supportsThirdPlace(teamCount: number): boolean {
+  return teamCount >= 4;
+}
+
+/**
+ * Builds a seeded single-elimination bracket. The third-place match is left
+ * out, even if requested, when {@link supportsThirdPlace} says there is none.
  */
 export function buildSingleElimination(
   teams: BracketTeam[],
@@ -244,7 +212,7 @@ export function buildSingleElimination(
   const matches = rounds.flat();
 
   const semis = rounds[rounds.length - 2];
-  if (options.thirdPlaceMatch && semis && semis.length === 2) {
+  if (options.thirdPlaceMatch && supportsThirdPlace(teams.length) && semis?.length === 2) {
     const third = factory.make('third_place', rounds.length, 0);
     link(semis[0]!, 'loser', third, 'A');
     link(semis[1]!, 'loser', third, 'B');
@@ -489,8 +457,6 @@ export function eliminationSize(
   if (teamCount < 2) return { rounds: 0, matches: 0 };
   const size = nextPowerOfTwo(teamCount);
   const k = Math.log2(size);
-  return {
-    rounds: k + (thirdPlaceMatch && k >= 2 ? 1 : 0),
-    matches: teamCount - 1 + (thirdPlaceMatch && k >= 2 ? 1 : 0),
-  };
+  const third = thirdPlaceMatch && supportsThirdPlace(teamCount) ? 1 : 0;
+  return { rounds: k + third, matches: teamCount - 1 + third };
 }

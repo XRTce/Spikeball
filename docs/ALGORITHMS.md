@@ -97,25 +97,27 @@ the heuristic social formats such as **Americano** use.
 Turniermodus ends the free-play phase by drafting fixed teams for the bracket:
 the best half of the chosen field ("captains") each pick one partner from the
 worse half ("pool"), strongest captain first. An odd field drops its weakest
-player to keep the split even. The result is a set of fixed 2-player teams,
-handed to the elimination builder below.
+player to keep the split even, and a draft needs at least four players
+(`MIN_DRAFT_PLAYERS`), since fewer cannot make the two teams a bracket needs.
+The result is a set of fixed 2-player teams, handed to the elimination builder
+below. The draft is the only way teams are formed for a bracket.
 
 ### Elimination — `pairing/elimination.ts`
 
-Knockouts need a stable entity to eliminate, which rotating partners are not.
-Outside of Turniermodus's draft, the participants can also be frozen into
-**fixed teams** by snake pairing (strongest with weakest, and so on inwards),
-the standard way to build evenly matched pairs from a ranked pool. Individual
-Elo keeps updating from every match either way. Either path seeds its teams the
-same way, by combined rating.
+Knockouts need a stable entity to eliminate, which rotating partners are not,
+so the bracket is played by the drafted **fixed teams**. Individual Elo keeps
+updating from every match. `seedTeams()` seeds the teams by combined rating
+(the mean of both partners, as in the Elo section).
 
 **Seeding** uses the standard bracket order, built by repeatedly mirroring the
 previous round's seed list — `[1,2]` → `[1,4,2,3]` → `[1,8,4,5,2,7,3,6]`. Top
 seeds can only meet in the final, and a field that is not a power of two gives
 the top seeds byes.
 
-A **third-place match** is only added once there is a real semi-final round -
-at least 4 teams. With fewer teams it is simply not created, even if requested.
+A **third-place match** needs two real semi-final losers, so at least 4 teams
+(`supportsThirdPlace()`). With 3 teams one semi-final is a walkover and the
+match for third would be one too, so it is not created even if requested; the
+draft screen hides the option in that case, using the same helper.
 
 ### Bracket resolution
 

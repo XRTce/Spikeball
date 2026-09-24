@@ -3,11 +3,14 @@ import type { TimedModeSettings } from '../domain/types';
 
 export interface Countdown {
   expired: boolean;
-  /** mm:ss, floored at zero. */
+  /**
+   * mm:ss, rounded up to the next full second and never below 0:00, so it
+   * reads 0:00 only once the time is actually up.
+   */
   label: string;
 }
 
-function format(remainingMs: number): Countdown {
+export function formatCountdown(remainingMs: number): Countdown {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -25,10 +28,14 @@ export function useTimedModeCountdown(timedMode: TimedModeSettings | null): Coun
 
   useEffect(() => {
     if (!startedAt) return;
+    // `now` is as old as the last tick (or the mount), which is before a
+    // timer that was just started; without this the first second would show
+    // more time than the configured duration.
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [startedAt]);
 
   if (!startedAt || !timedMode) return null;
-  return format(startedAt + timedMode.freePlayMinutes * 60_000 - now);
+  return formatCountdown(startedAt + timedMode.freePlayMinutes * 60_000 - now);
 }
