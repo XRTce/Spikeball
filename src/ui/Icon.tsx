@@ -218,6 +218,13 @@ const paths = {
       <path d="M14.5 14.5h2.5v2.5h-2.5zM19 14.5h1.5M14.5 19h1.5M19 19h1.5v1.5" />
     </>
   ),
+  camera: (
+    <>
+      <path d="M9 7.5 10.3 5h3.4L15 7.5" />
+      <rect x="3.5" y="7.5" width="17" height="12.5" rx="2.2" />
+      <circle cx="12" cy="13.7" r="3.4" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof paths;

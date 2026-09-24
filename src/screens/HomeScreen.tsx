@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -10,6 +10,7 @@ import {
   Icon,
   Screen,
   SectionTitle,
+  Segmented,
   Sheet,
   Shell,
   Skeleton,
@@ -17,6 +18,7 @@ import {
   TextField,
 } from '../ui';
 import { Logo } from '../components/Logo';
+import { QrScanner } from '../components/QrScanner';
 import { strings, formatRelative } from '../i18n';
 import { useTournamentList } from '../state/useTournament';
 import { parseJoinInput, useServerAvailable, useSyncStatus } from '../sync';
@@ -161,53 +163,112 @@ function PublicBadge({ tournamentId }: { tournamentId: string }) {
   );
 }
 
+type JoinMode = 'scan' | 'manual';
+
 function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<JoinMode>('scan');
   const [input, setInput] = useState('');
+  const [scanInvalid, setScanInvalid] = useState(false);
   const parsed = input.trim() ? parseJoinInput(input.trim()) : null;
   const invalid = input.trim().length > 0 && !parsed;
 
+  // Reopen fresh, always starting on the primary scan flow, so leftover
+  // state from a previous visit (a manual-entry detour, an invalid scan)
+  // never carries over.
+  useEffect(() => {
+    if (open) {
+      setMode('scan');
+      setScanInvalid(false);
+    }
+  }, [open]);
+
+  const close = () => {
+    setScanInvalid(false);
+    onClose();
+  };
+
+  const go = (tournamentId: string) => {
+    setInput('');
+    setScanInvalid(false);
+    onClose();
+    navigate(`/t/${tournamentId}`);
+  };
+
   const submit = () => {
     if (!parsed) return;
-    setInput('');
-    onClose();
-    navigate(`/t/${parsed}`);
+    go(parsed);
+  };
+
+  const handleScan = (text: string) => {
+    const scanned = parseJoinInput(text);
+    if (scanned) {
+      go(scanned);
+    } else {
+      setScanInvalid(true);
+    }
   };
 
   return (
     <Sheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       title={s.sync.join.title}
       actions={
-        <>
-          <Button variant="secondary" onClick={onClose}>
+        mode === 'manual' ? (
+          <>
+            <Button variant="secondary" onClick={close}>
+              {s.common.cancel}
+            </Button>
+            <Button variant="primary" icon="arrowRight" disabled={!parsed} onClick={submit}>
+              {s.sync.join.submit}
+            </Button>
+          </>
+        ) : (
+          <Button variant="secondary" onClick={close}>
             {s.common.cancel}
           </Button>
-          <Button variant="primary" icon="arrowRight" disabled={!parsed} onClick={submit}>
-            {s.sync.join.submit}
-          </Button>
-        </>
+        )
       }
     >
-      <form
-        className={css.joinForm}
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <TextField
-          label={s.sync.join.inputLabel}
-          placeholder={s.sync.join.inputPlaceholder}
-          value={input}
-          onChange={(event) => setInput(event.currentTarget.value)}
-          autoFocus
-          enterKeyHint="go"
-          error={invalid ? s.sync.join.invalid : undefined}
+      <div className={css.joinForm}>
+        <Segmented
+          ariaLabel={s.sync.join.title}
+          value={mode}
+          onChange={(next) => {
+            setScanInvalid(false);
+            setMode(next);
+          }}
+          options={[
+            { value: 'scan', label: s.sync.join.modeScan },
+            { value: 'manual', label: s.sync.join.modeManual },
+          ]}
         />
-        <p className={css.joinHint}>{s.sync.join.inputHint}</p>
-      </form>
+        {mode === 'scan' ? (
+          <>
+            <QrScanner onScan={handleScan} />
+            {scanInvalid && <p className={css.joinScanError}>{s.sync.join.invalid}</p>}
+          </>
+        ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
+            <TextField
+              label={s.sync.join.inputLabel}
+              placeholder={s.sync.join.inputPlaceholder}
+              value={input}
+              onChange={(event) => setInput(event.currentTarget.value)}
+              autoFocus
+              enterKeyHint="go"
+              error={invalid ? s.sync.join.invalid : undefined}
+            />
+            <p className={css.joinHint}>{s.sync.join.inputHint}</p>
+          </form>
+        )}
+      </div>
     </Sheet>
   );
 }
