@@ -18,6 +18,7 @@ import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
 import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
 import { SyncBadge } from '../components/SyncBadge';
 import { CountdownCard } from '../components/CountdownCard';
+import { ShareButton } from '../components/ShareButton';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import { groupRounds, scheduleProgress } from '../domain/schedule';
@@ -215,7 +216,12 @@ function CasualPlay({
         title={tournament.name}
         subtitle={s.play.casualTitle}
         back="/"
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>
@@ -401,7 +407,12 @@ function TournamentPlay({
         title={tournament.name}
         subtitle={tournament.format ? s.formats[tournament.format] : s.play.tournamentTitle}
         back="/"
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>
