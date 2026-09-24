@@ -18,6 +18,7 @@ import {
 } from '../ui';
 import { EloLineChart, WinLossChart, type Series } from '../ui/Charts';
 import { SyncBadge } from '../components/SyncBadge';
+import { ShareButton } from '../components/ShareButton';
 import { cx } from '../lib/cx';
 import { usePlayerColors } from '../state/playerColors';
 import { strings } from '../i18n';
@@ -83,7 +84,12 @@ export function TableScreen() {
         title={s.table.title}
         subtitle={tournament.name}
         back={`/t/${tournament.id}`}
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>

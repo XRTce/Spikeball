@@ -17,7 +17,9 @@ import {
 } from '../ui';
 import { ShareSheet } from '../components/ShareSheet';
 import { UnlockSheet } from '../components/UnlockSheet';
+import { PublishSheet } from '../components/PublishSheet';
 import { SyncBadge } from '../components/SyncBadge';
+import { ShareButton } from '../components/ShareButton';
 import { strings, formatRelative } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
 import {
@@ -36,7 +38,6 @@ import {
   isLockedError,
   leaveTournament,
   lockTournament,
-  publishTournament,
   syncNow,
   useServerAvailable,
   useSyncStatus,
@@ -85,7 +86,12 @@ export function MoreScreen() {
         title={s.more.title}
         subtitle={tournament.name}
         back={`/t/${tournament.id}`}
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>
@@ -521,73 +527,6 @@ export function MoreScreen() {
       />
       {guard.sheet}
     </>
-  );
-}
-
-function PublishSheet({
-  open,
-  tournamentId,
-  onClose,
-  onPublished,
-}: {
-  open: boolean;
-  tournamentId: string;
-  onClose: () => void;
-  onPublished: () => void;
-}) {
-  const toast = useToast();
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const passwordError =
-    password.length > 0 && password.length < LIMITS.passwordMin
-      ? s.create.passwordTooShort(LIMITS.passwordMin)
-      : undefined;
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title={s.sync.more.publishAction}
-      subtitle={s.sync.more.publishHint}
-      actions={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {s.common.cancel}
-          </Button>
-          <Button
-            variant="primary"
-            icon="qr"
-            busy={busy}
-            disabled={!!passwordError}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await publishTournament(tournamentId, password || null);
-                setPassword('');
-                onPublished();
-              } catch (error) {
-                console.error(error);
-                toast.error(s.errors.generic);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {s.sync.more.publishAction}
-          </Button>
-        </>
-      }
-    >
-      <TextField
-        label={s.create.password}
-        type="password"
-        value={password}
-        onChange={(event) => setPassword(event.currentTarget.value)}
-        autoComplete="new-password"
-        error={passwordError}
-      />
-      <p className={form.hint}>{s.create.passwordHint}</p>
-    </Sheet>
   );
 }
 
