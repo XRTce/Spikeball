@@ -151,6 +151,12 @@ export async function pushTournament(
     return { kind: 'conflict', revision: result.error.revision ?? 0, applied: result.error.applied ?? [] };
   }
   if (result.error.error === 'locked') return { kind: 'locked', reasons: result.error.reasons ?? [] };
+  // A push the server throttled is a transient condition, not an invalid
+  // change - genericError's 'rejected' would tell the engine (and eventually
+  // the badge) that the change itself was refused, which it wasn't. The
+  // engine already backs off and retries on any thrown SyncError, so this
+  // only needs a code that doesn't claim the push was invalid.
+  if (result.error.error === 'rate_limited') throw new SyncError('unknown', [], result.error.message);
   throw genericError(result.error);
 }
 
@@ -179,28 +185,12 @@ export async function setPassword(tournamentId: string, current: string | null, 
 
 /** A 403 here means the password did not match; 404/410 are treated as already gone. */
 export async function deleteTournament(tournamentId: string, password: string | null): Promise<void> {
-  const headers = password ? { [PASSWORD_HEADER]: password } : undefined;
-  const env = getSyncEnv();
-  if (!env.isOnline()) throw new SyncError('offline');
-  let response: Response;
-  try {
-    response = await env.fetch(`${env.apiBase()}/tournaments/${tournamentId}`, { method: 'DELETE', headers });
-  } catch {
-    throw new SyncError('offline');
-  }
-  if (response.ok || response.status === API_ERROR_STATUS.not_found || response.status === API_ERROR_STATUS.deleted) {
-    return;
-  }
-  let json: unknown;
-  try {
-    const text = await response.text();
-    json = text.length > 0 ? JSON.parse(text) : undefined;
-  } catch {
-    throw new SyncError('unavailable');
-  }
-  if (!isApiErrorBody(json)) throw new SyncError('unavailable');
-  if (json.error === 'locked') throw new SyncError('locked', json.reasons ?? [], json.message);
-  throw genericError(json);
+  const result = await rawRequest('DELETE', `/tournaments/${tournamentId}`, undefined, password);
+  if (result.ok) return;
+  // Deleting twice is fine: the tournament is gone either way.
+  if (result.error.error === 'not_found' || result.error.error === 'deleted') return;
+  if (result.error.error === 'locked') throw new SyncError('locked', result.error.reasons ?? [], result.error.message);
+  throw genericError(result.error);
 }
 
 export function eventsUrl(tournamentId: string): string {

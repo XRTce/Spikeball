@@ -133,7 +133,11 @@ async function recordSyncError(tournamentId: string, err: unknown): Promise<void
   }
   const code = err instanceof SyncError ? (err.code === 'wrong_password' ? 'rejected' : err.code) : 'unknown';
   const row = await db.sync.get(tournamentId);
-  if (row) await db.sync.update(tournamentId, { error: code });
+  // The row can vanish while the request was in flight (left or deleted
+  // everywhere meanwhile); forceCloseLiveSync already ran for it, so arming a
+  // retry here would resurrect a timer nothing will ever cancel.
+  if (!row) return;
+  await db.sync.update(tournamentId, { error: code });
   scheduleBackoffRetry(tournamentId);
 }
 
@@ -142,6 +146,11 @@ async function convertToLocal(tournamentId: string): Promise<void> {
     await db.tournaments.update(tournamentId, { visibility: 'local' });
     await db.sync.delete(tournamentId);
   });
+  // The sync row is gone, so a backoff timer from an earlier failed attempt
+  // would only fire into a no-op, and an EventSource still attached (when the
+  // deletion surfaced via push/pull rather than the SSE 'deleted' event, which
+  // closes its own) would keep a connection open for a tournament nobody syncs.
+  forceCloseLiveSync(tournamentId);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -348,10 +357,17 @@ export function detachLiveSync(tournamentId: string): void {
   }
 }
 
-/** Called when a tournament stops being public from under a live view (leave, delete-everywhere). */
+/**
+ * Called when a tournament's sync row is gone for good (leave, delete-
+ * everywhere, or a remote deletion converting it back to local): drops every
+ * trace the engine keeps for it, not just the live connection, so a pending
+ * backoff retry cannot linger after nothing will ever look at that id again.
+ */
 export function forceCloseLiveSync(tournamentId: string): void {
   liveRefCounts.delete(tournamentId);
   closeLiveSource(tournamentId);
+  clearBackoff(tournamentId);
+  pendingOpts.delete(tournamentId);
 }
 
 let started = false;

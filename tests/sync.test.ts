@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/db';
 import {
   addPlayer,
@@ -194,6 +194,17 @@ describe('the admin password', () => {
     expect((await db.sync.get(tournamentId))?.adminPassword).toBeNull();
   });
 
+  it('unlockTournament throws rejected when the server rate-limits password attempts', async () => {
+    const { tournamentId } = await seedTournament(1);
+    await publishTournament(tournamentId, 'geheim');
+    await syncNow(tournamentId);
+    await lockTournament(tournamentId);
+
+    env.server.setRateLimited(tournamentId, true);
+    await expect(unlockTournament(tournamentId, 'geheim')).rejects.toMatchObject({ code: 'rejected' });
+    expect((await db.sync.get(tournamentId))?.adminPassword).toBeNull();
+  });
+
   it('changeTournamentPassword sets, changes and removes the password', async () => {
     const { tournamentId } = await seedTournament(1);
     await publishTournament(tournamentId, null);
@@ -330,6 +341,40 @@ describe('conflicts and replay', () => {
     expect(sync?.revision).toBe(env.server.getRevision(tournamentId));
     // Discarding resets the local copy to the server's state: the player is back.
     expect(await db.players.get(playerIds[0]!)).toBeDefined();
+  });
+
+  it('a 429-rate-limited push keeps pending, is not reported as "rejected", and drains once the limit clears', async () => {
+    const { tournamentId } = await seedTournament(2);
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    // Go offline first so the command's own auto-triggered sync fails offline
+    // and leaves it queued, rather than racing the rate-limited push below.
+    env.online.value = false;
+    await addPlayer(tournamentId, 'Spieler C');
+    await syncNow(tournamentId);
+    expect((await db.sync.get(tournamentId))?.pending).toHaveLength(1);
+
+    env.online.value = true;
+    env.server.setRateLimited(tournamentId, true);
+    await syncNow(tournamentId);
+
+    let sync = await db.sync.get(tournamentId);
+    expect(sync?.pending).toHaveLength(1); // still queued, nothing was lost
+    // Rate limiting is transient, not the server refusing the change as
+    // invalid - `rejected` would be misleading here.
+    expect(sync?.error).toBe('unknown');
+    expect(sync?.error).not.toBe('rejected');
+
+    // The limit clears; the next attempt (a retry, in the real app driven by
+    // the backoff timer) goes through and drains the queue.
+    env.server.setRateLimited(tournamentId, false);
+    await syncNow(tournamentId);
+
+    sync = await db.sync.get(tournamentId);
+    expect(sync?.pending).toEqual([]);
+    expect(sync?.error).toBeNull();
+    expect(await db.players.where('tournamentId').equals(tournamentId).count()).toBe(3);
   });
 });
 
@@ -488,6 +533,72 @@ describe('joining, leaving and deleting', () => {
     expect(env.server.has(tournamentId)).toBe(true); // everyone else still has it
   });
 
+  it('leaveTournament during a pending backoff retry cancels it and makes no further request', async () => {
+    const { tournamentId } = await seedTournament(1);
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    let fetchCalls = 0;
+    let failing = true;
+    const passthrough = env.server.fetch;
+    configureSync({
+      fetch: async (...args: Parameters<typeof fetch>) => {
+        fetchCalls += 1;
+        if (failing) throw new TypeError('Failed to fetch');
+        return passthrough(...args);
+      },
+    });
+
+    await addPlayer(tournamentId, 'Spieler B');
+    await syncNow(tournamentId); // the push fails, so the engine arms a backoff retry
+    expect(fetchCalls).toBe(1);
+    expect(env.timers.pendingCount()).toBe(1);
+    const retries = env.timers.captured();
+
+    failing = false;
+    fetchCalls = 0;
+    await leaveTournament(tournamentId);
+
+    // Cancelled outright, not merely left to find nothing once it fires.
+    expect(env.timers.pendingCount()).toBe(0);
+
+    // Even if the retry fires anyway, it must not reach the network.
+    for (const retry of retries) retry();
+    await syncNow(tournamentId); // joins the loop the retry started, if any
+    expect(fetchCalls).toBe(0);
+    expect(env.timers.pendingCount()).toBe(0);
+  });
+
+  it('leaveTournament while a request is in flight does not arm a retry once it fails', async () => {
+    const { tournamentId } = await seedTournament(1);
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    let fetchCalls = 0;
+    let rejectInFlight: ((err: unknown) => void) | undefined;
+    configureSync({
+      fetch: () => {
+        fetchCalls += 1;
+        return new Promise<Response>((_resolve, reject) => {
+          rejectInFlight = reject;
+        });
+      },
+    });
+
+    await addPlayer(tournamentId, 'Spieler B');
+    const attempt = syncNow(tournamentId);
+    await vi.waitFor(() => expect(rejectInFlight).toBeDefined());
+
+    await leaveTournament(tournamentId);
+    rejectInFlight!(new TypeError('Failed to fetch'));
+    await attempt;
+
+    expect(env.timers.pendingCount()).toBe(0);
+    env.timers.runAll();
+    await syncNow(tournamentId);
+    expect(fetchCalls).toBe(1);
+  });
+
   it('deleteTournamentEverywhere needs the password when one is set', async () => {
     const { tournamentId } = await seedTournament(1);
     await publishTournament(tournamentId, 'geheim');
@@ -514,6 +625,24 @@ describe('joining, leaving and deleting', () => {
     await deleteTournamentEverywhere(tournamentId);
     expect(env.server.has(tournamentId)).toBe(false);
     expect(await db.tournaments.get(tournamentId)).toBeUndefined();
+  });
+
+  it('deleteTournamentEverywhere treats a tournament the server never got (still revision 0) as already gone', async () => {
+    const { tournamentId } = await seedTournament(1);
+    env.online.value = false;
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId); // offline: the create attempt fails, revision stays 0
+    env.online.value = true;
+
+    expect((await db.sync.get(tournamentId))?.revision).toBe(0);
+    expect(env.server.has(tournamentId)).toBe(false);
+
+    // The server answers 404 for an id it never created; that is deletion
+    // succeeding, not an error - deleting twice (or before the first upload) is fine.
+    await deleteTournamentEverywhere(tournamentId);
+
+    expect(await db.tournaments.get(tournamentId)).toBeUndefined();
+    expect(await db.sync.get(tournamentId)).toBeUndefined();
   });
 
   it('a remote deletion converts the local copy to local and reports a notice', async () => {
