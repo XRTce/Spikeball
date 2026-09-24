@@ -33,3 +33,15 @@
   text-transform: uppercase;
   color: var(--text-subtle);
 }
+
+/* Before the timer is started there is no number to show yet, just the
+   "X Min. freies Spiel" sentence - too long to set in the caption's small
+   uppercase style, so it gets its own readable, non-transformed treatment
+   while staying inside the same tile. */
+.timerNotStarted {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  color: var(--text-muted);
+  text-align: center;
+}
