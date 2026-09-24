@@ -86,14 +86,23 @@ verbindet eine statische Instanz mit einem Sync-Server anderswo.
 
 #### Mit Docker
 
+Zwei Compose-Dateien, gleiche Härtung (`read_only`, `cap_drop: ALL`,
+`no-new-privileges`, `pids_limit`), unterschiedliche Quelle fürs Image:
+
 ```bash
-docker compose up -d --build     # http://localhost:8080
+# Lokal: baut aus dem Arbeitsverzeichnis, Port direkt am Host
+docker compose -f docker-compose.dev.yml up -d --build     # http://localhost:8080
+
+# Produktion: zieht das von CI gebaute Image, kein Port am Host,
+# nur über Traefik erreichbar (siehe unten)
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-Ein anderer Port geht über `RALLY_PORT` (siehe `.env.example`):
+Ein anderer Port für den Dev-Stack geht über `RALLY_PORT` (siehe `.env.example`):
 
 ```bash
-RALLY_PORT=3000 docker compose up -d --build
+RALLY_PORT=3000 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 Das Image ist ein einzelner Node-Prozess (`node:22-alpine`, non-root), der die
@@ -130,15 +139,23 @@ Relevante Umgebungsvariablen (siehe auch [`docs/SYNC.md`](docs/SYNC.md)):
 
 `.github/workflows/deploy.yml` baut das Docker-Image bei jedem Push, pusht es
 nach GHCR (`ghcr.io/xrtce/spikeball`) und aktualisiert per SSH den
-`docker compose`-Stack auf einem eigenen Server &mdash; inklusive Sync-Server, im
-Gegensatz zu GitHub Pages. GitHub Pages läuft parallel weiter als kostenlose,
-rein lokale Instanz.
+`docker-compose.prod.yml`-Stack auf einem eigenen Server &mdash; inklusive
+Sync-Server, im Gegensatz zu GitHub Pages. GitHub Pages läuft parallel weiter
+als kostenlose, rein lokale Instanz.
 
-Voraussetzungen auf dem Server: Docker (mit dem Compose-Plugin), ein
-Reverse-Proxy mit TLS vor Port 8080 (nicht Teil dieses Workflows) und einmalig
-von Hand angelegt: das Zielverzeichnis mit einer `.env`
-(siehe [`.env.example`](.env.example), z. B. `RALLY_CORS_ORIGIN`, falls Pages
-und Server parallel laufen).
+Voraussetzungen auf dem Server, einmalig von Hand:
+
+- Docker mit dem Compose-Plugin.
+- Ein laufender [Traefik](https://doc.traefik.io/traefik/) mit einem
+  `web`- und einem `websecure`-Entrypoint samt Certresolver &mdash; `rally`
+  hängt sich nur per Label daran, betreibt aber selbst kein Traefik.
+- Dessen Docker-Netzwerk, falls es noch nicht existiert:
+  `docker network create traefik` (oder der Name aus `TRAEFIK_NETWORK`).
+- Das Zielverzeichnis mit einer `.env`
+  (siehe [`.env.example`](.env.example)): mindestens `RALLY_DOMAIN`, dazu
+  `RALLY_CORS_ORIGIN`, falls Pages und Server parallel laufen, und
+  `TRAEFIK_NETWORK`/`TRAEFIK_CERT_RESOLVER`, falls die bei dir nicht
+  `traefik`/`letsencrypt` heißen.
 
 Einmalig als Repository-Secrets nötig (*Settings &rarr; Secrets and variables
 &rarr; Actions*):
@@ -148,7 +165,7 @@ Einmalig als Repository-Secrets nötig (*Settings &rarr; Secrets and variables
 | `DEPLOY_HOST` | Hostname/IP des Servers |
 | `DEPLOY_USER` | SSH-Benutzer (muss `docker compose` ausführen dürfen) |
 | `DEPLOY_SSH_KEY` | Privater Schlüssel; der öffentliche Teil steht in `~/.ssh/authorized_keys` des Nutzers |
-| `DEPLOY_PATH` | Zielverzeichnis auf dem Server für `docker-compose.yml` und `.env` |
+| `DEPLOY_PATH` | Zielverzeichnis auf dem Server für `docker-compose.prod.yml` und `.env` |
 | `DEPLOY_PORT` | Optional, SSH-Port, Default `22` |
 | `GHCR_DEPLOY_TOKEN` | Classic PAT mit `read:packages`, mit dem der Server das (private) GHCR-Image zieht |
 

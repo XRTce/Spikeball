@@ -65,14 +65,14 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           script: mkdir -p "${{ secrets.DEPLOY_PATH }}"
 
-      - name: Upload docker-compose.yml
+      - name: Upload docker-compose.prod.yml
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
-          source: docker-compose.yml
+          source: docker-compose.prod.yml
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: Pull the new image and restart the stack
@@ -90,6 +90,6 @@ jobs:
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
             echo "$GHCR_DEPLOY_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
             docker image prune -f

@@ -1,18 +1,25 @@
+# Local development / self-test stack: always builds from the working tree.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d --build
+#
+# Same hardening as docker-compose.prod.yml (see there for rationale), just
+# with a local build and a port published straight to the host instead of a
+# GHCR image behind Traefik.
+
 services:
   rally:
     build:
       context: .
       dockerfile: Dockerfile
-    # ghcr.io/xrtce/spikeball on the deploy server (see .github/workflows/deploy.yml),
-    # or the local build's tag when run with `docker compose up -d --build`.
-    image: ghcr.io/xrtce/spikeball:latest
-    container_name: rally
+    image: rally-roundnet:dev
+    container_name: rally-dev
     restart: unless-stopped
     # Change the host port if 8080 is taken; the container always listens on 8080.
     ports:
       - "${RALLY_PORT:-8080}:8080"
     volumes:
-      - rally-data:/data
+      - rally-data-dev:/data
     # Optional sync settings, read from .env (see .env.example).
     environment:
       RALLY_CORS_ORIGIN: ${RALLY_CORS_ORIGIN:-}
@@ -21,11 +28,13 @@ services:
     read_only: true
     tmpfs:
       # Node needs somewhere to write if it ever does (e.g. os.tmpdir()).
-      - /tmp:mode=1777
+      - /tmp:mode=1777,size=16m
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Caps a fork bomb or runaway child-process leak at a small, fixed ceiling.
+    pids_limit: 128
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/api/health"]
       interval: 30s
@@ -39,4 +48,4 @@ services:
         max-file: "3"
 
 volumes:
-  rally-data:
+  rally-data-dev:
