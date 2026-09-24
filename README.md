@@ -135,42 +135,41 @@ Relevante Umgebungsvariablen (siehe auch [`docs/SYNC.md`](docs/SYNC.md)):
 > meisten Browsern dauerhaften Speicher zugesagt; der Status steht in den
 > Einstellungen.
 
-#### Automatisches Deployment auf einen eigenen Server
+#### CI: Image bauen und nach GHCR veröffentlichen
 
-`.github/workflows/deploy.yml` baut das Docker-Image bei jedem Push, pusht es
-nach GHCR (`ghcr.io/xrtce/spikeball`) und aktualisiert per SSH den
-`docker-compose.prod.yml`-Stack auf einem eigenen Server &mdash; inklusive
-Sync-Server, im Gegensatz zu GitHub Pages. GitHub Pages läuft parallel weiter
-als kostenlose, rein lokale Instanz.
+`.github/workflows/docker-publish.yml` baut bei jedem Push das Docker-Image
+und pusht es nach `ghcr.io/xrtce/spikeball` &mdash; mehr tut dieser Workflow
+nicht, es gibt keinen automatischen Zugriff auf irgendeinen Server. Der Tag
+richtet sich nach dem Branch:
 
-Voraussetzungen auf dem Server, einmalig von Hand:
-
-- Docker mit dem Compose-Plugin.
-- Ein laufender [Traefik](https://doc.traefik.io/traefik/) mit einem
-  `web`- und einem `websecure`-Entrypoint samt Certresolver &mdash; `rally`
-  hängt sich nur per Label daran, betreibt aber selbst kein Traefik.
-- Dessen Docker-Netzwerk, falls es noch nicht existiert:
-  `docker network create traefik` (oder der Name aus `TRAEFIK_NETWORK`).
-- Das Zielverzeichnis mit einer `.env`
-  (siehe [`.env.example`](.env.example)): mindestens `RALLY_DOMAIN`, dazu
-  `RALLY_CORS_ORIGIN`, falls Pages und Server parallel laufen, und
-  `TRAEFIK_NETWORK`/`TRAEFIK_CERT_RESOLVER`, falls die bei dir nicht
-  `traefik`/`letsencrypt` heißen.
-
-Einmalig als Repository-Secrets nötig (*Settings &rarr; Secrets and variables
-&rarr; Actions*):
-
-| Secret | Bedeutung |
+| Branch | Tag |
 |---|---|
-| `DEPLOY_HOST` | Hostname/IP des Servers |
-| `DEPLOY_USER` | SSH-Benutzer (muss `docker compose` ausführen dürfen) |
-| `DEPLOY_SSH_KEY` | Privater Schlüssel; der öffentliche Teil steht in `~/.ssh/authorized_keys` des Nutzers |
-| `DEPLOY_PATH` | Zielverzeichnis auf dem Server für `docker-compose.prod.yml` und `.env` |
-| `DEPLOY_PORT` | Optional, SSH-Port, Default `22` |
-| `GHCR_DEPLOY_TOKEN` | Classic PAT mit `read:packages`, mit dem der Server das (private) GHCR-Image zieht |
+| `main` | `latest` |
+| `dev` | `dev` |
+| alles andere, z. B. `fix/foo`, `feature/bar` | der Branch-Name (`/` wird zu `-`), also `fix-foo`, `feature-bar` |
 
-`GITHUB_TOKEN` für den Push nach GHCR braucht kein eigenes Secret &mdash; der
-Workflow nutzt den eingebauten Token mit `permissions: packages: write`.
+`GITHUB_TOKEN` genügt für den Push nach GHCR &mdash; kein eigenes Secret nötig,
+der Workflow läuft mit `permissions: packages: write`.
+
+Um ein Image tatsächlich auf einem Server auszurollen (z. B. mit
+`docker-compose.prod.yml`, siehe oben), zieh es dort per Hand oder eigenem
+Mechanismus (Cron, Webhook, Watchtower, ...): `docker compose -f
+docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up
+-d`. GHCR-Images sind standardmäßig privat &mdash; entweder das Package in den
+GitHub-Paketeinstellungen öffentlich stellen, oder auf dem Server einmalig
+`docker login ghcr.io` mit einem PAT (`read:packages`).
+
+#### Branch-Konzept
+
+- **`main`** &mdash; aktueller, veröffentlichter Stand. Jeder Push baut und
+  deployt GitHub Pages (`.github/workflows/pages.yml`) und veröffentlicht das
+  Docker-Image als `:latest`.
+- **`dev`** &mdash; laufende Entwicklung, bündelt mehrere Änderungen vor dem
+  Merge nach `main`. Baut nur das Docker-Image (als `:dev`), kein
+  Pages-Deploy.
+- **`feature/*`, `fix/*`, ...** &mdash; einzelne Änderungen, gegen `dev` oder
+  `main` gemergt und danach gelöscht. Jeder Push baut ebenfalls ein Image,
+  getaggt mit dem Branch-Namen, praktisch zum Testen vor dem Merge.
 
 ## Bedienung in 60 Sekunden
 

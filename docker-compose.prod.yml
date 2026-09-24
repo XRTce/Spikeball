@@ -1,11 +1,19 @@
-# Production stack: pulls the image CI publishes to GHCR (see
-# .github/workflows/deploy.yml). No port is published to the host - the
-# container is reachable only through an external Traefik reverse proxy,
-# which also terminates TLS.
+# Production stack: pulls the image CI publishes to GHCR on every push (see
+# .github/workflows/docker-publish.yml - main builds :latest, other branches
+# publish under their own branch name, e.g. dev -> :dev). No port is
+# published to the host - the container is reachable only through an
+# external Traefik reverse proxy, which also terminates TLS.
+#
+# CI only builds and publishes; nothing pulls this onto a server
+# automatically. Re-run the two commands below yourself (by hand, cron or
+# your own webhook) whenever you want the host to pick up a new image.
 #
 # One-time setup on the host:
 #   docker network create "${TRAEFIK_NETWORK:-traefik}"   # skip if Traefik already made it
 #   cp .env.example .env
+#   # GHCR images are private by default: either make the package public in
+#   # its GitHub package settings, or run `docker login ghcr.io` once with a
+#   # PAT that has read:packages, before the first `pull` below.
 #   # then set RALLY_DOMAIN, RALLY_CORS_ORIGIN and, if Traefik's network or
 #   # certresolver aren't named "traefik" / "letsencrypt", TRAEFIK_NETWORK /
 #   # TRAEFIK_CERT_RESOLVER too.
