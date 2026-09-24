@@ -1,0 +1,88 @@
+# Production stack: pulls the image CI publishes to GHCR (see
+# .github/workflows/deploy.yml). No port is published to the host - the
+# container is reachable only through an external Traefik reverse proxy,
+# which also terminates TLS.
+#
+# One-time setup on the host:
+#   docker network create "${TRAEFIK_NETWORK:-traefik}"   # skip if Traefik already made it
+#   cp .env.example .env
+#   # then set RALLY_DOMAIN, RALLY_CORS_ORIGIN and, if Traefik's network or
+#   # certresolver aren't named "traefik" / "letsencrypt", TRAEFIK_NETWORK /
+#   # TRAEFIK_CERT_RESOLVER too.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+
+services:
+  rally:
+    image: ghcr.io/xrtce/spikeball:latest
+    container_name: rally
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - rally-data:/data
+    # Optional sync settings, read from .env (see .env.example).
+    environment:
+      RALLY_CORS_ORIGIN: ${RALLY_CORS_ORIGIN:-}
+      RALLY_RETENTION_DAYS: ${RALLY_RETENTION_DAYS:-365}
+      # Safe to default to 1: with no `ports:` published, Traefik is the only
+      # way in, so its X-Forwarded-For entry is the one hop worth trusting.
+      # See docs/SYNC.md#rally_trust_proxy before changing this.
+      RALLY_TRUST_PROXY: ${RALLY_TRUST_PROXY:-1}
+    read_only: true
+    tmpfs:
+      # Node needs somewhere to write if it ever does (e.g. os.tmpdir()).
+      - /tmp:mode=1777,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Caps a fork bomb or runaway child-process leak at a small, fixed ceiling.
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+
+      # HTTPS router; RALLY_DOMAIN has no default so a forgotten .env fails
+      # the deploy loudly instead of routing an empty Host() rule.
+      - "traefik.http.routers.rally.rule=Host(`${RALLY_DOMAIN:?set RALLY_DOMAIN in .env}`)"
+      - "traefik.http.routers.rally.entrypoints=websecure"
+      - "traefik.http.routers.rally.tls=true"
+      - "traefik.http.routers.rally.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
+      - "traefik.http.routers.rally.middlewares=rally-hsts"
+      - "traefik.http.services.rally.loadbalancer.server.port=8080"
+
+      # Plain HTTP is redirected to HTTPS rather than served.
+      - "traefik.http.routers.rally-insecure.rule=Host(`${RALLY_DOMAIN:?set RALLY_DOMAIN in .env}`)"
+      - "traefik.http.routers.rally-insecure.entrypoints=web"
+      - "traefik.http.routers.rally-insecure.middlewares=rally-https-redirect"
+      - "traefik.http.middlewares.rally-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.rally-https-redirect.redirectscheme.permanent=true"
+
+      # HSTS at the edge; the app's own CSP and other security headers
+      # (server/static.ts) apply regardless of how it's reached.
+      - "traefik.http.middlewares.rally-hsts.headers.stsSeconds=15552000"
+      - "traefik.http.middlewares.rally-hsts.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.rally-hsts.headers.stsPreload=true"
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik}
+    external: true
+
+volumes:
+  rally-data:
