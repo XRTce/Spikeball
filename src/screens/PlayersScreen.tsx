@@ -21,6 +21,7 @@ import {
 } from '../ui';
 import { OptionList } from '../components/OptionList';
 import { SyncBadge } from '../components/SyncBadge';
+import { ShareButton } from '../components/ShareButton';
 import { cx } from '../lib/cx';
 import { strings } from '../i18n';
 import { usePlayerColors } from '../state/playerColors';
@@ -83,6 +84,7 @@ export function PlayersScreen() {
               />
             )}
             <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
           </>
         }
       />

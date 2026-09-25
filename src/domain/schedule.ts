@@ -1,5 +1,5 @@
-import { bracketOrder, isBracketStage } from './pairing/elimination';
-import type { Match, MatchStage } from './types';
+import { bracketOrder, eliminationSize, isBracketStage, resolveBracket } from './pairing/elimination';
+import type { BracketMeta, Match, MatchStage, PlaySettings, TournamentPhase, TournamentStatus } from './types';
 
 export interface RoundGroup {
   key: string;
@@ -138,4 +138,46 @@ export function scheduleProgress(matches: Match[], expectedTotal?: number): Sche
   const decided = relevant.filter((match) => match.status === 'done').length;
   const total = Math.max(expectedTotal ?? relevant.length, decided);
   return { played: decided, total, ratio: total === 0 ? 0 : decided / total };
+}
+
+/**
+ * Whether *submitting* this result is the one that finishes the tournament -
+ * every stage match decided, and the tournament not finished already.
+ *
+ * Pure and side-effect free: it simulates the same bracket resolution and
+ * progress count `recalculate()` (src/db/repo.ts) applies after the write
+ * actually lands, so a screen can react the instant a submit is confirmed
+ * rather than waiting for the next live-query render. `resolveBracket` is a
+ * no-op for a schedule with no bracket-stage matches, so this reads the same
+ * for every tournament format, not just single-elimination.
+ */
+export function matchCompletesTournament(
+  tournament: {
+    phase: TournamentPhase;
+    status: TournamentStatus;
+    bracket: BracketMeta | null;
+    play: PlaySettings;
+  },
+  matches: Match[],
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+): boolean {
+  if (tournament.phase !== 'tournament' || tournament.status === 'finished') return false;
+  if (scoreA === scoreB) return false; // no draws in roundnet - never a valid result
+
+  const target = matches.find((match) => match.id === matchId);
+  if (!target || target.stage === 'casual') return false;
+
+  const updated = matches.map((match) =>
+    match.id === matchId ? { ...match, scoreA, scoreB, status: 'done' as const } : match,
+  );
+  const resolved = resolveBracket(updated);
+
+  const expected = tournament.bracket
+    ? eliminationSize(tournament.bracket.teams.length, tournament.play.thirdPlaceMatch).matches
+    : undefined;
+
+  const progress = scheduleProgress(resolved, expected);
+  return progress.total > 0 && progress.played === progress.total;
 }

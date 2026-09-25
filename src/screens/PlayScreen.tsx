@@ -17,9 +17,11 @@ import { MatchCard, ResultSheet, teamLabel } from '../components/MatchCard';
 import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
 import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
 import { SyncBadge } from '../components/SyncBadge';
+import { CountdownCard } from '../components/CountdownCard';
+import { ShareButton } from '../components/ShareButton';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
-import { groupRounds, scheduleProgress } from '../domain/schedule';
+import { groupRounds, matchCompletesTournament, scheduleProgress } from '../domain/schedule';
 import { eliminationSize } from '../domain/pairing/elimination';
 import { suggestCasualMatch } from '../domain/pairing/casual';
 import { matchWinProbability } from '../domain/elo';
@@ -27,6 +29,7 @@ import {
   clearMatchResult,
   deleteMatch,
   finishTournament,
+  getTournament,
   scheduleCasualMatch,
   setMatchResult,
 } from '../db/repo';
@@ -40,6 +43,7 @@ const s = strings;
 
 export function PlayScreen() {
   const view = useTournamentView();
+  const navigate = useNavigate();
   const toast = useToast();
   const tournament = view.tournament!;
   const guard = useGuardedAction(tournament.id);
@@ -59,9 +63,28 @@ export function PlayScreen() {
       playerById={view.playerById}
       play={tournament.play}
       onClose={() => setResultMatch(null)}
-      onSubmit={(matchId, a, b) =>
-        guard.run(() => setMatchResult(matchId, a, b).then(() => setResultMatch(null)))
-      }
+      onSubmit={(matchId, a, b) => {
+        // Decided against the schedule as it stands *before* this result
+        // lands - the same instant the tap happens, not after the next
+        // live-query re-render - so the celebration fires exactly once, for
+        // the submission that actually completes the tournament.
+        const willFinish = matchCompletesTournament(tournament, view.matches, matchId, a, b);
+        guard.run(async () => {
+          await setMatchResult(matchId, a, b);
+          setResultMatch(null);
+          if (!willFinish) return;
+          // Single-elimination brackets already auto-finish inside
+          // recalculate() once the bracket resolves; re-check the freshly
+          // written row rather than assuming, so this never double-finishes
+          // (or races the live-query view, which may not have re-rendered
+          // yet) before navigating to the celebration.
+          const fresh = await getTournament(tournament.id);
+          if (fresh && fresh.status !== 'finished') {
+            await finishTournament(tournament.id);
+          }
+          navigate(`/t/${tournament.id}/finished`, { state: { celebrate: true } });
+        });
+      }}
       onClear={(matchId) =>
         guard.run(() => clearMatchResult(matchId).then(() => setResultMatch(null)))
       }
@@ -214,18 +237,20 @@ function CasualPlay({
         title={tournament.name}
         subtitle={s.play.casualTitle}
         back="/"
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>
           {tournament.timedMode && (
-            <Badge tone={countdown?.expired ? 'warn' : 'neutral'} icon="clock">
-              {!tournament.timedMode.timerStartedAt
-                ? s.more.timerNotStarted(tournament.timedMode.freePlayMinutes)
-                : countdown?.expired
-                  ? s.more.timerExpired
-                  : countdown?.label}
-            </Badge>
+            <CountdownCard
+              countdown={countdown}
+              notStartedLabel={s.more.timerNotStarted(tournament.timedMode.freePlayMinutes)}
+            />
           )}
           {view.players.length > 0 && (
             <Button variant="secondary" icon="checkCircle" onClick={onOpenAvailability}>
@@ -329,9 +354,6 @@ function CasualPlay({
                     key={match.id}
                     match={match}
                     playerById={view.playerById}
-                    ratings={view.ratings}
-                    baseElo={tournament.elo.baseElo}
-                    showProbability
                     onEnterResult={onEnterResult}
                   />
                 ))}
@@ -377,6 +399,7 @@ function TournamentPlay({
   runGuarded: (fn: () => unknown) => void;
 }) {
   const view = useTournamentView();
+  const navigate = useNavigate();
   const tournament = view.tournament!;
 
   const groups = useMemo(() => groupRounds(view.matches), [view.matches]);
@@ -406,7 +429,12 @@ function TournamentPlay({
         title={tournament.name}
         subtitle={tournament.format ? s.formats[tournament.format] : s.play.tournamentTitle}
         back="/"
-        actions={<SyncBadge tournamentId={tournament.id} />}
+        actions={
+          <>
+            <SyncBadge tournamentId={tournament.id} />
+            <ShareButton tournamentId={tournament.id} />
+          </>
+        }
       />
       <Screen withTabbar>
         <Stack>
@@ -453,9 +481,6 @@ function TournamentPlay({
                     match={match}
                     playerById={view.playerById}
                     deltas={view.replay.perMatch[match.id]?.delta}
-                    ratings={view.ratings}
-                    baseElo={tournament.elo.baseElo}
-                    showProbability
                     onEnterResult={onEnterResult}
                   />
                 ))}
@@ -463,16 +488,37 @@ function TournamentPlay({
             </>
           )}
 
-          {everythingPlayed && tournament.status !== 'finished' && (
+          {everythingPlayed && tournament.status !== 'finished' ? (
+            // The normal path finishes (and celebrates) the instant the
+            // completing result is submitted - see PlayScreen's onSubmit.
+            // This stays as a fallback for whatever that auto-detection
+            // misses (a correction, a sync merge, a reopened tournament
+            // replayed to the same result, ...).
             <Button
               variant="primary"
               size="lg"
               icon="trophy"
               block
-              onClick={() => runGuarded(() => finishTournament(tournament.id))}
+              onClick={() =>
+                runGuarded(async () => {
+                  await finishTournament(tournament.id);
+                  navigate(`/t/${tournament.id}/finished`);
+                })
+              }
             >
               {s.play.finish}
             </Button>
+          ) : (
+            tournament.status === 'finished' && (
+              <Button
+                variant="secondary"
+                icon="chart"
+                block
+                onClick={() => navigate(`/t/${tournament.id}/finished`)}
+              >
+                {s.play.viewResults}
+              </Button>
+            )
           )}
         </Stack>
       </Screen>

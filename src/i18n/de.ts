@@ -127,12 +127,14 @@ export const de = {
     selectNone: 'Alle abwählen',
     finish: 'Turnier abschließen',
     finished: 'Turnier abgeschlossen',
+    viewResults: 'Ergebnisse ansehen',
     progressOf: (played: number, total: number) => `${played} von ${total} Spielen`,
     result: 'Ergebnis eintragen',
     swap: 'Teams tauschen',
     reopen: 'Ergebnis löschen',
     deleteMatch: 'Spiel löschen',
-    winner: 'Sieger',
+    matchFinished: 'Abgeschlossen',
+    matchRunning: 'Läuft',
     matchActions: 'Weitere Aktionen',
     teamPending: 'Noch offen',
     noDraws: 'Unentschieden gibt es beim Roundnet nicht.',
@@ -183,6 +185,11 @@ export const de = {
     scope: 'Zeitraum',
     winRate: 'Siegquote',
     headToHead: 'Bilanz gegen und mit',
+    headToHeadOpponentsCaption: 'Als Gegner',
+    headToHeadOpponentsRecord: (wins: number, losses: number) =>
+      `${wins} ${wins === 1 ? 'Sieg' : 'Siege'}, ${losses} ${losses === 1 ? 'Niederlage' : 'Niederlagen'}`,
+    headToHeadPartnersCaption: 'Als Team',
+    headToHeadPartnersRecord: (wins: number, played: number) => `${wins} von ${played} gewonnen`,
   },
   more: {
     title: 'Mehr',
@@ -289,6 +296,12 @@ export const de = {
     second: 'Platz 2',
     third: 'Platz 3',
   },
+  finished: {
+    intro: 'Alle Spiele sind gespielt - hier ist das Ergebnis.',
+    noResults: 'Noch keine Ergebnisse.',
+    viewTable: 'Zur Tabelle',
+    backToPlay: 'Zurück zum Spiel',
+  },
   draft: {
     title: 'Team-Draft',
     setupTitle: 'Wie viele Spieler ins Bracket?',
@@ -359,6 +372,8 @@ export const de = {
     join: {
       action: 'Turnier beitreten',
       title: 'Turnier beitreten',
+      modeScan: 'Scannen',
+      modeManual: 'Eingeben',
       inputLabel: 'Link oder Code',
       inputPlaceholder: 'z.B. https://rally.app/t/…',
       inputHint: 'Du kannst auch einfach den QR-Code mit der Kamera scannen.',
@@ -369,6 +384,13 @@ export const de = {
       retry: 'Erneut versuchen',
       offlineText: 'Zum Beitreten wird eine Verbindung benötigt.',
       unavailableText: 'Kein Sync-Server erreichbar.',
+      scanStarting: 'Kamera wird gestartet…',
+      scanHint: 'Richte die Kamera auf den QR-Code des Turniers.',
+      cameraDenied:
+        'Kein Zugriff auf die Kamera. Bitte erlaube den Zugriff in den Einstellungen oder gib den Link manuell ein.',
+      cameraUnavailable: 'Keine Kamera gefunden. Gib den Link stattdessen manuell ein.',
+      cameraUnsupported: 'Dieser Browser unterstützt kein Scannen per Kamera. Gib den Link manuell ein.',
+      cameraError: 'Kamera konnte nicht gestartet werden. Gib den Link stattdessen manuell ein.',
     },
     more: {
       section: 'Teilen',
