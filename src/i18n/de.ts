@@ -139,6 +139,10 @@ export const de = {
     teamPending: 'Noch offen',
     noDraws: 'Unentschieden gibt es beim Roundnet nicht.',
     pointsFor: (team: string) => `Punkte ${team}`,
+    bo1: 'Bo1',
+    bo3: 'Bo3',
+    gameOf: (n: number, total: number) => `Spiel ${n} von ${total}`,
+    seriesScore: (a: number, b: number) => `${a} : ${b}`,
   },
   players: {
     title: 'Spieler',

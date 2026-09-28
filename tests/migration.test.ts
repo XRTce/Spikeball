@@ -204,7 +204,7 @@ describe('Dexie v3 upgrade of a pre-refactor database', () => {
   afterEach(() => db.close());
 
   it('opens at the current version with every tournament in the current shape', async () => {
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
     const all = await listTournaments();
     expect(all).toHaveLength(5);
     for (const t of all) expectCurrentShape(t);

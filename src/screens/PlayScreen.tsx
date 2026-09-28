@@ -25,10 +25,12 @@ import { groupRounds, matchCompletesTournament, scheduleProgress } from '../doma
 import { eliminationSize } from '../domain/pairing/elimination';
 import { suggestCasualMatch } from '../domain/pairing/casual';
 import { matchWinProbability } from '../domain/elo';
+import { gamesWon, isSeriesDecided } from '../domain/bestOf';
 import {
   clearMatchResult,
   deleteMatch,
   finishTournament,
+  getMatch,
   getTournament,
   scheduleCasualMatch,
   setMatchResult,
@@ -36,7 +38,7 @@ import {
 import { useTimedModeCountdown } from '../state/timedMode';
 import { useAvailablePlayers } from '../state/availablePlayers';
 import { useGuardedAction } from '../state/useGuardedAction';
-import type { Match, Player } from '../domain/types';
+import type { Match, MatchFormat, Player } from '../domain/types';
 import css from './PlayScreen.module.css';
 
 const s = strings;
@@ -64,13 +66,26 @@ export function PlayScreen() {
       play={tournament.play}
       onClose={() => setResultMatch(null)}
       onSubmit={(matchId, a, b) => {
+        // A bo3 game only finishes the match (and can finish the tournament)
+        // once a side has won 2 games - an earlier game in the series never
+        // does, no matter the score.
+        const match = view.matches.find((m) => m.id === matchId);
+        const prospectiveGames = [...(match?.games ?? []), { scoreA: a, scoreB: b }];
+        const decided = isSeriesDecided(match?.format ?? 'bo1', prospectiveGames);
         // Decided against the schedule as it stands *before* this result
         // lands - the same instant the tap happens, not after the next
         // live-query re-render - so the celebration fires exactly once, for
         // the submission that actually completes the tournament.
-        const willFinish = matchCompletesTournament(tournament, view.matches, matchId, a, b);
+        const wins = gamesWon(prospectiveGames);
+        const willFinish =
+          decided && matchCompletesTournament(tournament, view.matches, matchId, wins.a, wins.b);
         guard.run(async () => {
           await setMatchResult(matchId, a, b);
+          if (!decided) {
+            // Series continues - keep the sheet open on the next game.
+            setResultMatch((await getMatch(matchId)) ?? null);
+            return;
+          }
           setResultMatch(null);
           if (!willFinish) return;
           // Single-elimination brackets already auto-finish inside
@@ -184,6 +199,7 @@ function CasualPlay({
   const navigate = useNavigate();
   const needed = view.teamSize * 2;
   const countdown = useTimedModeCountdown(tournament.timedMode);
+  const [format, setFormat] = useState<MatchFormat>('bo1');
 
   const onCourt = useMemo(
     () =>
@@ -314,6 +330,22 @@ function CasualPlay({
               </div>
 
               <div className={css.actions}>
+                <div className={css.actionRow}>
+                  <Button
+                    size="sm"
+                    variant={format === 'bo1' ? 'primary' : 'secondary'}
+                    onClick={() => setFormat('bo1')}
+                  >
+                    {s.play.bo1}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={format === 'bo3' ? 'primary' : 'secondary'}
+                    onClick={() => setFormat('bo3')}
+                  >
+                    {s.play.bo3}
+                  </Button>
+                </div>
                 <Button
                   variant="primary"
                   size="lg"
@@ -321,7 +353,7 @@ function CasualPlay({
                   block
                   onClick={() =>
                     runGuarded(() =>
-                      scheduleCasualMatch(tournament.id, suggestion.teamA, suggestion.teamB),
+                      scheduleCasualMatch(tournament.id, suggestion.teamA, suggestion.teamB, format),
                     )
                   }
                 >

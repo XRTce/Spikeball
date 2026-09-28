@@ -63,7 +63,10 @@ export function protectedChanges(before: ProtectionInput, after: ProtectionInput
 
   const afterMatches = new Map(after.matches.map((match) => [match.id, match]));
   for (const match of before.matches) {
-    if (match.status !== 'done' || match.bye) continue;
+    // A bo3 with at least one game recorded already has a rated result, even
+    // before the series itself is decided - deleting or clearing it needs
+    // the password just as much as a finished match would.
+    if (match.games.length === 0 || match.bye) continue;
     const next = afterMatches.get(match.id);
     // A played match whose teams changed was re-routed by the bracket after an
     // earlier result was corrected; that is a consequence, not a deletion.

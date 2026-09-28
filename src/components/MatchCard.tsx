@@ -14,6 +14,7 @@ import { usePlayerColors } from '../state/playerColors';
 import { strings, formatRelative } from '../i18n';
 import { matchCode } from '../domain/pairing/elimination';
 import { useSyncStatus } from '../sync';
+import { gamesWon } from '../domain/bestOf';
 import type { Match, Player, PlaySettings } from '../domain/types';
 import css from './MatchCard.module.css';
 
@@ -123,6 +124,7 @@ export function MatchCard({
     <div className={css.card}>
       <div className={css.head}>
         <span className={css.stage}>{stageLabel(match)}</span>
+        <Badge tone="neutral">{match.format === 'bo3' ? s.play.bo3 : s.play.bo1}</Badge>
         {decided ? (
           <Badge tone="win" icon="check">
             {s.play.matchFinished}
@@ -154,6 +156,12 @@ export function MatchCard({
           deltas={decided ? deltas : undefined}
         />
       </div>
+
+      {match.format === 'bo3' && match.games.length > 0 && (
+        <div className={css.gameBreakdown}>
+          {match.games.map((game) => `${game.scoreA}-${game.scoreB}`).join(' · ')}
+        </div>
+      )}
 
       <div className={css.foot}>
         <span className={css.footMeta}>
@@ -218,8 +226,16 @@ export function ResultSheet({
 
   useEffect(() => {
     if (!match) return;
-    setScoreA(match.scoreA ?? play.pointsToWin);
-    setScoreB(match.scoreB ?? 0);
+    // Editing a decided match corrects its last game; otherwise this is a
+    // fresh entry for the next game of the series (or the only game, bo1).
+    const lastGame = match.games[match.games.length - 1];
+    if (match.status === 'done' && lastGame) {
+      setScoreA(lastGame.scoreA);
+      setScoreB(lastGame.scoreB);
+    } else {
+      setScoreA(play.pointsToWin);
+      setScoreB(0);
+    }
   }, [match, play.pointsToWin]);
 
   const problem = useMemo(() => {
@@ -231,6 +247,10 @@ export function ResultSheet({
 
   const nameA = teamLabel(match.teamA, playerById);
   const nameB = teamLabel(match.teamB, playerById);
+  const isBo3 = match.format === 'bo3';
+  const seriesOpen = isBo3 && match.status !== 'done';
+  const wins = gamesWon(match.games);
+  const gameNumber = match.games.length + 1;
 
   const applyPreset = (winner: 'A' | 'B', loserScore: number) => {
     if (winner === 'A') {
@@ -246,8 +266,12 @@ export function ResultSheet({
     <Sheet
       open
       onClose={onClose}
-      title={s.play.result}
-      subtitle={`${nameA} ${s.common.vs} ${nameB}`}
+      title={seriesOpen ? s.play.gameOf(gameNumber, 3) : s.play.result}
+      subtitle={
+        seriesOpen && match.games.length > 0
+          ? `${nameA} ${s.common.vs} ${nameB} · ${s.play.seriesScore(wins.a, wins.b)}`
+          : `${nameA} ${s.common.vs} ${nameB}`
+      }
       actions={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -319,7 +343,7 @@ export function ResultSheet({
           )}
         </div>
 
-        {(onClear || onDelete) && match.status === 'done' && (
+        {(onClear || onDelete) && (match.status === 'done' || match.games.length > 0) && (
           <div className={css.sheetActions}>
             {onClear && (
               <Button

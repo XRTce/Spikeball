@@ -10,6 +10,7 @@ import {
   listMatches,
   listPlayers,
   recordCasualResult,
+  scheduleCasualMatch,
   setMatchResult,
   startDraftedBracket,
   startFreePlayTimer,
@@ -235,6 +236,72 @@ describe('tournament mode', () => {
     const matches = await listMatches(tournamentId);
     expect(matches).toHaveLength(1);
     expect(matches[0]!.stage).toBe('casual');
+  });
+});
+
+describe('best-of format', () => {
+  it('defaults a casual match to bo1 and honours an explicit bo3', async () => {
+    const { tournamentId, playerIds } = await seedTournament(8);
+    const [a, b, c, d, e, f] = playerIds as [string, string, string, string, string, string];
+
+    const bo1Id = await scheduleCasualMatch(tournamentId, [a, b], [c, d]);
+    const bo3Id = await scheduleCasualMatch(tournamentId, [e, f], [a, b], 'bo3');
+    const matches = await listMatches(tournamentId);
+    expect(matches.find((m) => m.id === bo1Id)?.format).toBe('bo1');
+    expect(matches.find((m) => m.id === bo3Id)?.format).toBe('bo3');
+  });
+
+  it('creates every bracket match as bo3', async () => {
+    const { tournamentId, playerIds } = await seedTournament(8);
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds), thirdPlaceMatch: true });
+    const matches = await listMatches(tournamentId);
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.every((match) => match.format === 'bo3')).toBe(true);
+  });
+
+  it('keeps a bo3 open after one game and rates it already, then auto-finishes on the second win', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+
+    const afterGame1 = await setMatchResult(matchId, 21, 15);
+    expect(afterGame1.decided).toBe(false);
+    let match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.status).toBe('scheduled');
+    expect(match.games).toHaveLength(1);
+    // Elo already reflects the first game, before the series is decided.
+    expect((await db.players.get(a))!.elo).toBeGreaterThan(1000);
+
+    const afterGame2 = await setMatchResult(matchId, 21, 18);
+    expect(afterGame2.decided).toBe(true);
+    match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.status).toBe('done');
+    expect(match.games).toHaveLength(2);
+    // The top-level score is the games-won tally, not raw points.
+    expect(match.scoreA).toBe(2);
+    expect(match.scoreB).toBe(0);
+  });
+
+  it('never asks for a third game once a side has won twice', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+    await setMatchResult(matchId, 21, 10);
+    const { decided } = await setMatchResult(matchId, 21, 12);
+    expect(decided).toBe(true);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.games).toHaveLength(2);
+  });
+
+  it('keeps a bo1 top-level score as the raw points, not a games-won tally', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d]);
+    const { decided } = await setMatchResult(matchId, 21, 18);
+    expect(decided).toBe(true);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.scoreA).toBe(21);
+    expect(match.scoreB).toBe(18);
   });
 });
 

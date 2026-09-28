@@ -38,6 +38,8 @@ export function resetSequence(): void {
 
 export function makeMatch(overrides: Partial<Match> = {}): Match {
   sequence += 1;
+  const scoreA = overrides.scoreA ?? null;
+  const scoreB = overrides.scoreB ?? null;
   return {
     id: overrides.id ?? nextId('m'),
     tournamentId: 't1',
@@ -49,6 +51,8 @@ export function makeMatch(overrides: Partial<Match> = {}): Match {
     scoreA: null,
     scoreB: null,
     status: 'scheduled',
+    format: 'bo1',
+    games: scoreA != null && scoreB != null ? [{ scoreA, scoreB }] : [],
     bye: false,
     createdAt: sequence,
     playedAt: null,
@@ -104,6 +108,12 @@ export function draftToMatch(draft: BracketMatchDraft): Match {
     scoreA: draft.scoreA,
     scoreB: draft.scoreB,
     status: draft.status,
+    // Bracket matches are always bo3 in the real app (src/db/repo.ts).
+    format: 'bo3',
+    games:
+      draft.scoreA != null && draft.scoreB != null
+        ? [{ scoreA: draft.scoreA, scoreB: draft.scoreB }]
+        : [],
     bye: draft.bye,
     createdAt: sequence,
     playedAt: null,

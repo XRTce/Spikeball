@@ -119,8 +119,41 @@ export function isRatedMatch(match: Match): boolean {
   );
 }
 
+/**
+ * Matches with at least one recorded game, whether or not the series (bo3)
+ * is decided yet - each game is its own Elo event the moment it is entered.
+ */
+export function hasRatableGames(match: Match): boolean {
+  return !match.bye && match.teamA.length > 0 && match.teamB.length > 0 && match.games.length > 0;
+}
+
 export function compareMatchOrder(a: Match, b: Match): number {
   return a.sequence - b.sequence || a.createdAt - b.createdAt || a.id.localeCompare(b.id);
+}
+
+interface RatedGameUnit {
+  matchId: string;
+  teamA: string[];
+  teamB: string[];
+  scoreA: number;
+  scoreB: number;
+}
+
+/** Flattens every match's games into individually-rated units, in play order. */
+function flattenRatedGames(matches: Match[]): RatedGameUnit[] {
+  const units: RatedGameUnit[] = [];
+  for (const match of matches.filter(hasRatableGames).sort(compareMatchOrder)) {
+    for (const game of match.games) {
+      units.push({
+        matchId: match.id,
+        teamA: match.teamA,
+        teamB: match.teamB,
+        scoreA: game.scoreA,
+        scoreB: game.scoreB,
+      });
+    }
+  }
+  return units;
 }
 
 /**
@@ -155,10 +188,11 @@ export function replayElo(
     });
   }
 
-  const rated = matches.filter(isRatedMatch).sort(compareMatchOrder);
+  const rated = flattenRatedGames(matches);
+  const matchById = new Map(matches.map((match) => [match.id, match]));
 
-  for (const match of rated) {
-    const participants = [...match.teamA, ...match.teamB];
+  for (const unit of rated) {
+    const participants = [...unit.teamA, ...unit.teamB];
     // A result referencing a deleted player is skipped rather than crashing.
     if (participants.some((id) => ratings[id] === undefined)) continue;
 
@@ -166,14 +200,19 @@ export function replayElo(
     for (const id of participants) before[id] = ratings[id]!;
 
     const deltas = computeMatchDeltas({
-      teamA: match.teamA,
-      teamB: match.teamB,
-      scoreA: match.scoreA!,
-      scoreB: match.scoreB!,
+      teamA: unit.teamA,
+      teamB: unit.teamB,
+      scoreA: unit.scoreA,
+      scoreB: unit.scoreB,
       ratings,
       matchesPlayed,
       settings,
     });
+
+    const sequence = matchById.get(unit.matchId)?.sequence ?? 0;
+    const existing = perMatch[unit.matchId];
+    const matchBefore = existing?.before ?? before;
+    const matchDelta = existing?.delta ?? {};
 
     for (const id of participants) {
       const delta = deltas[id] ?? 0;
@@ -182,15 +221,16 @@ export function replayElo(
       matchesPlayed[id] = (matchesPlayed[id] ?? 0) + 1;
       history.push({
         playerId: id,
-        matchId: match.id,
-        sequence: match.sequence,
+        matchId: unit.matchId,
+        sequence,
         before: before[id]!,
         after,
         delta,
       });
+      matchDelta[id] = (matchDelta[id] ?? 0) + delta;
     }
 
-    perMatch[match.id] = { before, delta: deltas };
+    perMatch[unit.matchId] = { before: matchBefore, delta: matchDelta };
   }
 
   return { ratings, matchesPlayed, history, perMatch };

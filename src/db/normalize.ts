@@ -114,6 +114,13 @@ export function normalizeMatch(raw: Row, options: NormalizeRowOptions): Match | 
   next.feedsLoserTo = raw.feedsLoserTo ?? null;
   next.labelA = raw.labelA ?? null;
   next.labelB = raw.labelB ?? null;
+  // Added for bo1/bo3 support; a backup from before it has neither field.
+  next.format = raw.format ?? 'bo1';
+  next.games =
+    raw.games ??
+    (raw.scoreA != null && raw.scoreB != null
+      ? [{ scoreA: raw.scoreA, scoreB: raw.scoreB }]
+      : []);
 
   const wasCasual = raw.stage === 'casual';
   const flatten = options.tournamentReverted || !CURRENT_STAGES.has(raw.stage as string);

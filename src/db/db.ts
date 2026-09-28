@@ -131,6 +131,23 @@ export class RallyDatabase extends Dexie {
             });
         }
       });
+    // Adds bo1/bo3 formats and a per-game score log. Every pre-existing
+    // match becomes a bo1 whose one game mirrors its existing
+    // scoreA/scoreB. No index changes.
+    this.version(4)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table('matches')
+          .toCollection()
+          .modify((match: Partial<Match>) => {
+            match.format ??= 'bo1';
+            match.games ??=
+              match.scoreA != null && match.scoreB != null
+                ? [{ scoreA: match.scoreA, scoreB: match.scoreB }]
+                : [];
+          }),
+      );
   }
 }
 

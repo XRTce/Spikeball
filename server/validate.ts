@@ -44,7 +44,21 @@ const TOURNAMENT_PHASES = new Set(['casual', 'tournament']);
 const TOURNAMENT_STATUSES = new Set(['open', 'running', 'finished']);
 const MATCH_STAGES = new Set(['casual', 'winners', 'third_place']);
 const MATCH_STATUSES = new Set(['scheduled', 'done']);
+const MATCH_FORMATS = new Set(['bo1', 'bo3']);
+const MAX_GAMES_PER_MATCH = 3;
 const SLOTS = new Set(['A', 'B']);
+
+function validateMatchGames(value: unknown, field: string): string | null {
+  if (!Array.isArray(value) || value.length > MAX_GAMES_PER_MATCH) {
+    return `${field} must be an array of at most ${MAX_GAMES_PER_MATCH} games`;
+  }
+  for (const game of value) {
+    if (!isPlainObject(game)) return `${field} entries must be objects`;
+    if (!isFiniteNumber(game.scoreA)) return `${field}.scoreA must be a number`;
+    if (!isFiniteNumber(game.scoreB)) return `${field}.scoreB must be a number`;
+  }
+  return null;
+}
 
 function validateEloSettings(value: unknown): string | null {
   if (!isPlainObject(value)) return 'tournament.elo must be an object';
@@ -174,6 +188,9 @@ function validateMatch(value: unknown, tournamentId: string, seenIds: Set<string
   if (!isNullOr(value.scoreA, isFiniteNumber)) return `match.scoreA must be a number or null (${value.id})`;
   if (!isNullOr(value.scoreB, isFiniteNumber)) return `match.scoreB must be a number or null (${value.id})`;
   if (!MATCH_STATUSES.has(value.status as string)) return `match.status is invalid (${value.id})`;
+  if (!MATCH_FORMATS.has(value.format as string)) return `match.format is invalid (${value.id})`;
+  const gamesError = validateMatchGames(value.games, `match.games (${value.id})`);
+  if (gamesError) return gamesError;
   if (typeof value.bye !== 'boolean') return `match.bye must be a boolean (${value.id})`;
   if (!isFiniteNumber(value.createdAt)) return `match.createdAt must be a number (${value.id})`;
   if (!isNullOr(value.playedAt, isFiniteNumber)) return `match.playedAt must be a number or null (${value.id})`;
