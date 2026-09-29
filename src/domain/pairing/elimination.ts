@@ -253,6 +253,7 @@ export function resolveBracket(matches: Match[]): Match[] {
     ...match,
     teamA: [...match.teamA],
     teamB: [...match.teamB],
+    games: [...match.games],
   }));
   const bracket = working.filter((match) => isBracketStage(match.stage));
   if (bracket.length === 0) return working;
@@ -297,10 +298,16 @@ export function resolveBracket(matches: Match[]): Match[] {
       before !== undefined &&
       (before.a.join(',') !== match.teamA.join(',') || before.b.join(',') !== match.teamB.join(','));
 
-    if (teamsChanged && (match.scoreA !== null || match.scoreB !== null)) {
-      // The recorded score belonged to a different pairing - drop it.
+    if (
+      teamsChanged &&
+      (match.scoreA !== null || match.scoreB !== null || match.games.length > 0)
+    ) {
+      // The recorded result belonged to a different pairing - drop it,
+      // including the games of a series that was not decided yet; left in
+      // place they would be rated for (and counted towards) the new teams.
       match.scoreA = null;
       match.scoreB = null;
+      match.games = [];
       match.playedAt = null;
     }
 
@@ -312,6 +319,7 @@ export function resolveBracket(matches: Match[]): Match[] {
       match.status = 'done';
       match.scoreA = null;
       match.scoreB = null;
+      match.games = [];
       winner = DEAD;
       loser = DEAD;
     } else if (stateA.kind === 'dead' || stateB.kind === 'dead') {
@@ -321,6 +329,7 @@ export function resolveBracket(matches: Match[]): Match[] {
         match.status = 'done';
         match.scoreA = null;
         match.scoreB = null;
+        match.games = [];
         winner = live;
         loser = DEAD;
       } else {

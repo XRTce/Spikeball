@@ -99,9 +99,7 @@ export async function joinTournament(tournamentId: string): Promise<void> {
 
   const fetched = await api.fetchTournament(tournamentId);
   await db.transaction('rw', db.tournaments, db.players, db.matches, db.sync, async () => {
-    await db.tournaments.add({ ...fetched.snapshot.tournament, visibility: 'public' });
-    if (fetched.snapshot.players.length > 0) await db.players.bulkAdd(fetched.snapshot.players);
-    if (fetched.snapshot.matches.length > 0) await db.matches.bulkAdd(fetched.snapshot.matches);
+    await writeSnapshotRows(fetched.snapshot);
     const row: SyncRow = {
       tournamentId,
       role: 'joined',

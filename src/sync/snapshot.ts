@@ -4,6 +4,7 @@
  * replay, an ordinary pull, join and discard) has one implementation.
  */
 import { db, type SyncRow } from '../db/db';
+import { withBestOfFields } from '../domain/bestOf';
 import type { TournamentSnapshot } from './protocol';
 import type { ProtectionInput } from './protection';
 
@@ -35,6 +36,10 @@ export async function readProtectionSnapshot(tournamentId: string): Promise<Prot
  * does NOT run recalculate(): the snapshot already holds derived state
  * (ratings, bracket progression), and recomputing it here would just be
  * redoing work the pushing device already did.
+ *
+ * Matches are brought to the current shape on the way in: the server stores
+ * whatever a client pushed, so a snapshot saved before bo1/bo3 support (or
+ * pushed by a client that has not updated yet) lacks `format` and `games`.
  */
 export async function writeSnapshotRows(snapshot: TournamentSnapshot): Promise<void> {
   const tournamentId = snapshot.tournament.id;
@@ -42,5 +47,5 @@ export async function writeSnapshotRows(snapshot: TournamentSnapshot): Promise<v
   await db.players.where('tournamentId').equals(tournamentId).delete();
   await db.tournaments.put({ ...snapshot.tournament, visibility: 'public' });
   if (snapshot.players.length > 0) await db.players.bulkAdd(snapshot.players);
-  if (snapshot.matches.length > 0) await db.matches.bulkAdd(snapshot.matches);
+  if (snapshot.matches.length > 0) await db.matches.bulkAdd(snapshot.matches.map(withBestOfFields));
 }

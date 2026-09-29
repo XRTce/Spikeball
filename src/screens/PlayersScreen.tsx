@@ -52,6 +52,13 @@ export function PlayersScreen() {
 
   const locked = tournament.phase === 'tournament';
 
+  // Matches played comes from the standings, like on the player detail
+  // screen; the Elo replay counts every game of a bo3 separately.
+  const playedById = useMemo(
+    () => new Map(view.standings.map((row) => [row.playerId, row.played])),
+    [view.standings],
+  );
+
   const nameTaken = useMemo(
     () =>
       view.players.some(
@@ -138,7 +145,7 @@ export function PlayersScreen() {
               <div className={css.list}>
                 {view.players.map((player) => {
                   const rating = view.ratings[player.id] ?? player.baseElo;
-                  const played = view.replay.matchesPlayed[player.id] ?? 0;
+                  const played = playedById.get(player.id) ?? 0;
                   return (
                     <div
                       key={player.id}

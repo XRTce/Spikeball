@@ -65,9 +65,34 @@ the rest inconsistent. With a few hundred matches the replay costs well under a
 millisecond, so it simply runs after every mutation and on every render that
 needs numbers.
 
-Ordering matters for Elo, so a match takes its sequence number when its **result
-is recorded**, not when it is scheduled — and it keeps that number when the
-score is later corrected, so a correction never reshuffles the history after it.
+Ordering matters for Elo, so a match takes its sequence number when its **first
+result is recorded**, not when it is scheduled — and it keeps that number when
+the score is later corrected, so a correction never reshuffles the history after
+it. The games of a bo3 replay in the order they were played, one after another.
+
+### Best of three
+
+`src/domain/bestOf.ts`
+
+A casual match is played as one game (bo1) or best of three (bo3); bracket
+matches are always bo3. **Every game is its own rating event**, rated the moment
+it is entered, so a 2:1 moves ratings through three updates and a bo3 weighs
+more than a bo1 without any extra factor. The K-factor tier counts these rated
+games as well: a player leaves the provisional K after `provisionalMatches`
+games, each game of a bo3 included, as rating lists count games rather than
+matches.
+
+A series is decided once a side has two game wins; the match score is then the
+tally (2:1), which is what bracket progression reads. There is never a third
+game after a 2:0. The standings count the series as one played match and take
+the point difference from the real points of its games. A series still in
+progress already moves ratings but is not a played match yet.
+
+`recordGame()` is the one rule for entering a game, used both when the result
+is stored and by the result screen to predict whether a submission finishes the
+match. A correction may target any game: one that decides the series earlier
+drops the games after it (they cannot have been played), and one that undoes the
+deciding win reopens the series.
 
 > References: A. Elo, *The Rating of Chessplayers, Past and Present* (1978);
 > FIDE handbook B.02 (K-factor tiers); FiveThirtyEight's NBA/NFL Elo
@@ -128,7 +153,9 @@ consequences fall out for free:
 
 - Correcting an early result repairs the whole downstream bracket.
 - A score that no longer belongs to the teams now standing in that match is
-  discarded instead of being silently mis-attributed.
+  discarded instead of being silently mis-attributed — together with its games,
+  including those of a series that was not decided yet, so they neither count
+  towards the new pairing's series nor get rated for it.
 
 Byes propagate as walkovers: a match whose opponent slot can never be filled
 resolves to a walkover for the team that is there.
@@ -141,4 +168,5 @@ resolves to a walkover for the team that is there.
 
 Ranked by wins, then point difference, then points scored, then rating, then
 name — the usual club order, with a deterministic final tiebreak so the table
-never jitters between renders.
+never jitters between renders. Wins and matches played count decided matches (a
+bo3 is one); points are the real points of every game.

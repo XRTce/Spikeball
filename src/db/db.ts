@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { Match, Player, Tournament } from '../domain/types';
 import type { CommandName, SyncErrorCode } from '../sync/protocol';
+import { withBestOfFields } from '../domain/bestOf';
 import { normalizeMatch, normalizePlayer, normalizeTournament } from './normalize';
 
 export interface MetaRow {
@@ -131,21 +132,19 @@ export class RallyDatabase extends Dexie {
             });
         }
       });
-    // Adds bo1/bo3 formats and a per-game score log. Every pre-existing
-    // match becomes a bo1 whose one game mirrors its existing
-    // scoreA/scoreB. No index changes.
+    // Adds bo1/bo3 formats and a per-game score log: every pre-existing
+    // match becomes a bo1 whose one game is its recorded score. The rule is
+    // `withBestOfFields`, shared with backup import and the sync pull (a
+    // server snapshot stored before the update has the old shape too). No
+    // index changes.
     this.version(4)
       .stores({})
       .upgrade((tx) =>
         tx
           .table('matches')
           .toCollection()
-          .modify((match: Partial<Match>) => {
-            match.format ??= 'bo1';
-            match.games ??=
-              match.scoreA != null && match.scoreB != null
-                ? [{ scoreA: match.scoreA, scoreB: match.scoreB }]
-                : [];
+          .modify((raw: Record<string, unknown>, ref: { value: unknown }) => {
+            ref.value = withBestOfFields(raw);
           }),
       );
   }

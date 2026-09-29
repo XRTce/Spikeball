@@ -7,6 +7,7 @@ import {
   EloDelta,
   Icon,
   NumberStepper,
+  Segmented,
   Sheet,
 } from '../ui';
 import { cx } from '../lib/cx';
@@ -14,7 +15,7 @@ import { usePlayerColors } from '../state/playerColors';
 import { strings, formatRelative } from '../i18n';
 import { matchCode } from '../domain/pairing/elimination';
 import { useSyncStatus } from '../sync';
-import { gamesWon } from '../domain/bestOf';
+import { MAX_GAMES, defaultGameIndex, gamesWon, isSeriesDecided } from '../domain/bestOf';
 import type { Match, Player, PlaySettings } from '../domain/types';
 import css from './MatchCard.module.css';
 
@@ -98,6 +99,9 @@ export function MatchCard({
   const decided = match.status === 'done' && match.scoreA !== null && match.scoreB !== null;
   const aWon = decided && (match.scoreA ?? 0) > (match.scoreB ?? 0);
   const playable = match.teamA.length > 0 && match.teamB.length > 0;
+  const isBo3 = match.format === 'bo3';
+  // A running series shows its games-won tally where a result would go.
+  const tally = isBo3 && !decided && match.games.length > 0 ? gamesWon(match.games) : null;
 
   if (match.bye) {
     const resting = match.teamA.length > 0 ? match.teamA : match.teamB;
@@ -123,8 +127,13 @@ export function MatchCard({
   return (
     <div className={css.card}>
       <div className={css.head}>
-        <span className={css.stage}>{stageLabel(match)}</span>
-        <Badge tone="neutral">{match.format === 'bo3' ? s.play.bo3 : s.play.bo1}</Badge>
+        <span className={css.headMain}>
+          <span className={css.stage}>{stageLabel(match)}</span>
+          {/* Only where it was a choice: bo1 is the casual default, and a
+              bracket match is always bo3 - there the badge would only push
+              the match code ("WB1.2") out of the header on a phone. */}
+          {isBo3 && match.stage === 'casual' && <Badge tone="neutral">{s.play.bo3}</Badge>}
+        </span>
         {decided ? (
           <Badge tone="win" icon="check">
             {s.play.matchFinished}
@@ -140,7 +149,7 @@ export function MatchCard({
         <Side
           ids={match.teamA}
           label={match.labelA}
-          score={match.scoreA}
+          score={tally ? tally.a : match.scoreA}
           isWinner={aWon}
           decided={decided}
           playerById={playerById}
@@ -149,7 +158,7 @@ export function MatchCard({
         <Side
           ids={match.teamB}
           label={match.labelB}
-          score={match.scoreB}
+          score={tally ? tally.b : match.scoreB}
           isWinner={decided && !aWon}
           decided={decided}
           playerById={playerById}
@@ -157,9 +166,9 @@ export function MatchCard({
         />
       </div>
 
-      {match.format === 'bo3' && match.games.length > 0 && (
+      {isBo3 && match.games.length > 0 && (
         <div className={css.gameBreakdown}>
-          {match.games.map((game) => `${game.scoreA}-${game.scoreB}`).join(' · ')}
+          {match.games.map((game) => s.play.gameScore(game.scoreA, game.scoreB)).join(' · ')}
         </div>
       )}
 
@@ -200,7 +209,8 @@ export interface ResultSheetProps {
   playerById: Map<string, Player>;
   play: PlaySettings;
   onClose: () => void;
-  onSubmit: (matchId: string, scoreA: number, scoreB: number) => void;
+  /** `gameIndex` is the game of the series the score is for - see `recordGame`. */
+  onSubmit: (matchId: string, scoreA: number, scoreB: number, gameIndex: number) => void;
   onClear?: (matchId: string) => void;
   onDelete?: (matchId: string) => void;
 }
@@ -208,6 +218,10 @@ export interface ResultSheetProps {
 /**
  * Score entry, built for one-handed use between rallies: both scores start at
  * the target score and zero, so a 21:14 is five taps.
+ *
+ * A bo3 is entered one game at a time. Once it has a game, the sheet lists
+ * the games so far; picking one corrects it, and an open series also offers
+ * the next game, which is where the sheet starts.
  */
 export function ResultSheet({
   match,
@@ -221,22 +235,26 @@ export function ResultSheet({
   const colors = usePlayerColors();
   const status = useSyncStatus(match?.tournamentId);
   const locked = status.isProtected && !status.unlocked;
+  const [gameIndex, setGameIndex] = useState(0);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
 
+  const loadGame = (source: Match, index: number) => {
+    const game = source.games[index];
+    setGameIndex(index);
+    setScoreA(game ? game.scoreA : play.pointsToWin);
+    setScoreB(game ? game.scoreB : 0);
+  };
+
+  // Back to the default game whenever the series itself changes - a game was
+  // saved here or arrived by sync - but not on every live-query refresh of
+  // the match list, which would wipe a half-entered score.
+  const seriesKey = match
+    ? `${match.id}|${match.status}|${match.games.map((g) => `${g.scoreA}:${g.scoreB}`).join(',')}`
+    : null;
   useEffect(() => {
-    if (!match) return;
-    // Editing a decided match corrects its last game; otherwise this is a
-    // fresh entry for the next game of the series (or the only game, bo1).
-    const lastGame = match.games[match.games.length - 1];
-    if (match.status === 'done' && lastGame) {
-      setScoreA(lastGame.scoreA);
-      setScoreB(lastGame.scoreB);
-    } else {
-      setScoreA(play.pointsToWin);
-      setScoreB(0);
-    }
-  }, [match, play.pointsToWin]);
+    if (match) loadGame(match, defaultGameIndex(match));
+  }, [seriesKey, play.pointsToWin]);
 
   const problem = useMemo(() => {
     if (scoreA === scoreB) return s.play.noDraws;
@@ -248,9 +266,15 @@ export function ResultSheet({
   const nameA = teamLabel(match.teamA, playerById);
   const nameB = teamLabel(match.teamB, playerById);
   const isBo3 = match.format === 'bo3';
-  const seriesOpen = isBo3 && match.status !== 'done';
   const wins = gamesWon(match.games);
-  const gameNumber = match.games.length + 1;
+  const correcting = gameIndex < match.games.length;
+  // Every game so far, plus the next one while the series is still open.
+  const gameSlots = match.games.length + (isSeriesDecided(match.format, match.games) ? 0 : 1);
+  const title = !isBo3
+    ? s.play.result
+    : correcting
+      ? s.play.correctGame(gameIndex + 1)
+      : s.play.gameOf(gameIndex + 1, MAX_GAMES.bo3);
 
   const applyPreset = (winner: 'A' | 'B', loserScore: number) => {
     if (winner === 'A') {
@@ -266,9 +290,9 @@ export function ResultSheet({
     <Sheet
       open
       onClose={onClose}
-      title={seriesOpen ? s.play.gameOf(gameNumber, 3) : s.play.result}
+      title={title}
       subtitle={
-        seriesOpen && match.games.length > 0
+        isBo3 && match.games.length > 0
           ? `${nameA} ${s.common.vs} ${nameB} · ${s.play.seriesScore(wins.a, wins.b)}`
           : `${nameA} ${s.common.vs} ${nameB}`
       }
@@ -281,7 +305,7 @@ export function ResultSheet({
             variant="primary"
             icon="check"
             disabled={problem !== null}
-            onClick={() => onSubmit(match.id, scoreA, scoreB)}
+            onClick={() => onSubmit(match.id, scoreA, scoreB, gameIndex)}
           >
             {s.common.save}
           </Button>
@@ -289,6 +313,28 @@ export function ResultSheet({
       }
     >
       <div className={css.entry}>
+        {isBo3 && match.games.length > 0 && (
+          <Segmented
+            ariaLabel={s.play.games}
+            value={String(gameIndex)}
+            onChange={(value) => loadGame(match, Number(value))}
+            options={Array.from({ length: gameSlots }, (_, index) => {
+              const game = match.games[index];
+              return {
+                value: String(index),
+                label: (
+                  <span className={css.gameOption}>
+                    <span>{s.play.gameLabel(index + 1)}</span>
+                    <span className={css.gameOptionScore}>
+                      {game ? s.play.gameScore(game.scoreA, game.scoreB) : s.play.gameNew}
+                    </span>
+                  </span>
+                ),
+              };
+            })}
+          />
+        )}
+
         <div className={cx(css.entryTeam, scoreA > scoreB && css.entryLeading)}>
           <div className={css.entryHead}>
             <AvatarStack

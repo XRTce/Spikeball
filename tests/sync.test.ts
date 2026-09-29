@@ -30,10 +30,20 @@ import {
   type SyncNotice,
 } from '../src/sync/index';
 import { configureSync } from '../src/sync/config';
-import type { Player } from '../src/domain/types';
+import type { Match, Player } from '../src/domain/types';
+import { replayElo } from '../src/domain/elo';
+import { playedMatch } from './helpers';
 import { setupSyncTest, type SyncTestEnv } from './support/testEnv';
 
 let env: SyncTestEnv;
+
+/** A match the way a client from before bo1/bo3 support pushes it. */
+function withoutBestOf(match: Match): Match {
+  const legacy: Record<string, unknown> = { ...match };
+  delete legacy.format;
+  delete legacy.games;
+  return legacy as unknown as Match;
+}
 
 beforeEach(async () => {
   await db.delete();
@@ -513,6 +523,35 @@ describe('joining, leaving and deleting', () => {
     expect(sync?.role).toBe('joined');
     expect(sync?.revision).toBe(revision);
     expect(await db.players.where('tournamentId').equals(tournamentId).count()).toBe(2);
+  });
+
+  it('brings a snapshot stored before bo1/bo3 support into the current shape, on pull and on join', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds;
+    await publishTournament(tournamentId, null);
+    await syncNow(tournamentId);
+
+    // A device on an older build pushes a result: no format, no games.
+    env.server.pushAsOtherDevice(tournamentId, (snapshot) => ({
+      ...snapshot,
+      matches: [withoutBestOf(playedMatch([a!, b!], [c!, d!], 21, 15, { tournamentId }))],
+    }));
+
+    const expectCurrentShape = async () => {
+      const matches = await listMatches(tournamentId);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({ format: 'bo1', games: [{ scoreA: 21, scoreB: 15 }] });
+      const players = await db.players.where('tournamentId').equals(tournamentId).toArray();
+      const tournament = (await db.tournaments.get(tournamentId))!;
+      expect(replayElo(players, matches, tournament.elo).ratings[a!]).toBeGreaterThan(1000);
+    };
+
+    await syncNow(tournamentId); // an ordinary pull
+    await expectCurrentShape();
+
+    await leaveTournament(tournamentId);
+    await joinTournament(tournamentId); // a fresh device scanning the QR code
+    await expectCurrentShape();
   });
 
   it('joinTournament throws not_found for an unknown id', async () => {

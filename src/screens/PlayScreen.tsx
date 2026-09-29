@@ -14,6 +14,7 @@ import {
   useToast,
 } from '../ui';
 import { MatchCard, ResultSheet, teamLabel } from '../components/MatchCard';
+import { MatchFormatPicker } from '../components/MatchFormatPicker';
 import { PlayerPickerSheet } from '../components/PlayerPickerSheet';
 import { AvailablePlayersSheet } from '../components/AvailablePlayersSheet';
 import { SyncBadge } from '../components/SyncBadge';
@@ -25,12 +26,11 @@ import { groupRounds, matchCompletesTournament, scheduleProgress } from '../doma
 import { eliminationSize } from '../domain/pairing/elimination';
 import { suggestCasualMatch } from '../domain/pairing/casual';
 import { matchWinProbability } from '../domain/elo';
-import { gamesWon, isSeriesDecided } from '../domain/bestOf';
+import { gamesWon, recordGame } from '../domain/bestOf';
 import {
   clearMatchResult,
   deleteMatch,
   finishTournament,
-  getMatch,
   getTournament,
   scheduleCasualMatch,
   setMatchResult,
@@ -50,7 +50,14 @@ export function PlayScreen() {
   const tournament = view.tournament!;
   const guard = useGuardedAction(tournament.id);
 
-  const [resultMatch, setResultMatch] = useState<Match | null>(null);
+  // The sheet follows the live row rather than a copy, so it moves on to the
+  // next game of a series (or closes, if the match disappears) by itself.
+  const [resultMatchId, setResultMatchId] = useState<string | null>(null);
+  const resultMatch = resultMatchId
+    ? (view.matches.find((match) => match.id === resultMatchId) ?? null)
+    : null;
+  const openResult = (match: Match) => setResultMatchId(match.id);
+  const [format, setFormat] = useState<MatchFormat>('bo1');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [availableIds, setAvailableIds] = useAvailablePlayers(tournament.id, view.activePlayers);
@@ -64,29 +71,34 @@ export function PlayScreen() {
       match={resultMatch}
       playerById={view.playerById}
       play={tournament.play}
-      onClose={() => setResultMatch(null)}
-      onSubmit={(matchId, a, b) => {
-        // A bo3 game only finishes the match (and can finish the tournament)
-        // once a side has won 2 games - an earlier game in the series never
-        // does, no matter the score.
+      onClose={() => setResultMatchId(null)}
+      onSubmit={(matchId, a, b, gameIndex) => {
         const match = view.matches.find((m) => m.id === matchId);
-        const prospectiveGames = [...(match?.games ?? []), { scoreA: a, scoreB: b }];
-        const decided = isSeriesDecided(match?.format ?? 'bo1', prospectiveGames);
+        if (!match) return;
+        // The same rule setMatchResult applies, so this never disagrees with
+        // what gets stored: a bo3 game only finishes the match (and can
+        // finish the tournament) once a side has won 2 games.
+        const outcome = recordGame(match, gameIndex, a, b);
         // Decided against the schedule as it stands *before* this result
         // lands - the same instant the tap happens, not after the next
         // live-query re-render - so the celebration fires exactly once, for
         // the submission that actually completes the tournament.
-        const wins = gamesWon(prospectiveGames);
         const willFinish =
-          decided && matchCompletesTournament(tournament, view.matches, matchId, wins.a, wins.b);
+          outcome.decided &&
+          matchCompletesTournament(tournament, view.matches, matchId, outcome.scoreA, outcome.scoreB);
         guard.run(async () => {
-          await setMatchResult(matchId, a, b);
-          if (!decided) {
-            // Series continues - keep the sheet open on the next game.
-            setResultMatch((await getMatch(matchId)) ?? null);
+          await setMatchResult(matchId, a, b, gameIndex);
+          if (!outcome.decided) {
+            // The series goes on and the sheet stays open on its next game.
+            // A correction that undid the deciding win says so, because the
+            // finished match just went back on court.
+            if (match.status === 'done') {
+              const wins = gamesWon(outcome.games);
+              toast.show(s.play.seriesReopened(wins.a, wins.b));
+            }
             return;
           }
-          setResultMatch(null);
+          setResultMatchId(null);
           if (!willFinish) return;
           // Single-elimination brackets already auto-finish inside
           // recalculate() once the bracket resolves; re-check the freshly
@@ -101,10 +113,10 @@ export function PlayScreen() {
         });
       }}
       onClear={(matchId) =>
-        guard.run(() => clearMatchResult(matchId).then(() => setResultMatch(null)))
+        guard.run(() => clearMatchResult(matchId).then(() => setResultMatchId(null)))
       }
       onDelete={(matchId) =>
-        guard.run(() => deleteMatch(matchId).then(() => setResultMatch(null)))
+        guard.run(() => deleteMatch(matchId).then(() => setResultMatchId(null)))
       }
     />
   );
@@ -115,7 +127,7 @@ export function PlayScreen() {
         <TournamentPlay
           activeRound={activeRound}
           setActiveRound={setActiveRound}
-          onEnterResult={setResultMatch}
+          onEnterResult={openResult}
           runGuarded={guard.run}
         />
         {resultSheet}
@@ -135,7 +147,9 @@ export function PlayScreen() {
         eligiblePlayers={eligiblePlayers}
         filterActive={availableIds !== null}
         onReshuffle={() => setSeed((value) => value + 1)}
-        onEnterResult={setResultMatch}
+        format={format}
+        onFormatChange={setFormat}
+        onEnterResult={openResult}
         onOpenPicker={() => setPickerOpen(true)}
         onOpenAvailability={() => setAvailabilityOpen(true)}
         runGuarded={guard.run}
@@ -148,9 +162,11 @@ export function PlayScreen() {
         players={eligiblePlayers}
         ratings={view.ratings}
         teamSize={view.teamSize}
+        format={format}
+        onFormatChange={setFormat}
         onConfirm={(teamA, teamB) =>
           guard.run(async () => {
-            await scheduleCasualMatch(tournament.id, teamA, teamB);
+            await scheduleCasualMatch(tournament.id, teamA, teamB, format);
             setPickerOpen(false);
             toast.success(s.play.matchScheduled);
           })
@@ -180,6 +196,8 @@ function CasualPlay({
   eligiblePlayers,
   filterActive,
   onReshuffle,
+  format,
+  onFormatChange,
   onEnterResult,
   onOpenPicker,
   onOpenAvailability,
@@ -189,6 +207,8 @@ function CasualPlay({
   eligiblePlayers: Player[];
   filterActive: boolean;
   onReshuffle: () => void;
+  format: MatchFormat;
+  onFormatChange: (format: MatchFormat) => void;
   onEnterResult: (match: Match) => void;
   onOpenPicker: () => void;
   onOpenAvailability: () => void;
@@ -199,7 +219,6 @@ function CasualPlay({
   const navigate = useNavigate();
   const needed = view.teamSize * 2;
   const countdown = useTimedModeCountdown(tournament.timedMode);
-  const [format, setFormat] = useState<MatchFormat>('bo1');
 
   const onCourt = useMemo(
     () =>
@@ -330,22 +349,7 @@ function CasualPlay({
               </div>
 
               <div className={css.actions}>
-                <div className={css.actionRow}>
-                  <Button
-                    size="sm"
-                    variant={format === 'bo1' ? 'primary' : 'secondary'}
-                    onClick={() => setFormat('bo1')}
-                  >
-                    {s.play.bo1}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={format === 'bo3' ? 'primary' : 'secondary'}
-                    onClick={() => setFormat('bo3')}
-                  >
-                    {s.play.bo3}
-                  </Button>
-                </div>
+                <MatchFormatPicker value={format} onChange={onFormatChange} />
                 <Button
                   variant="primary"
                   size="lg"

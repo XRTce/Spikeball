@@ -65,7 +65,7 @@ export const de = {
     kFactor: 'K-Faktor',
     provisionalK: 'K (neu)',
     provisionalMatches: 'Spiele bis etabliert',
-    provisionalMatchesHint: 'Bis dahin gilt der höhere K-Faktor',
+    provisionalMatchesHint: 'Bis dahin gilt der höhere K-Faktor. Jeder Satz eines Bo3 zählt einzeln.',
     pointsToWin: 'Spiel bis',
     pointsToWinHint: 'Zielpunktzahl für die Ergebniseingabe',
     marginOfVictory: 'Deutlichkeit des Siegs einrechnen',
@@ -139,10 +139,20 @@ export const de = {
     teamPending: 'Noch offen',
     noDraws: 'Unentschieden gibt es beim Roundnet nicht.',
     pointsFor: (team: string) => `Punkte ${team}`,
+    format: 'Format',
     bo1: 'Bo1',
     bo3: 'Bo3',
-    gameOf: (n: number, total: number) => `Spiel ${n} von ${total}`,
+    // One game of a series is a "Satz": "Spiel" already means the whole
+    // match everywhere else ("Spiel löschen", "2 von 4 Spielen").
+    games: 'Sätze',
+    gameLabel: (n: number) => `Satz ${n}`,
+    gameNew: 'neu',
+    gameOf: (n: number, total: number) => `Satz ${n} von ${total}`,
+    correctGame: (n: number) => `Satz ${n} korrigieren`,
+    gameScore: (a: number, b: number) => `${a}:${b}`,
     seriesScore: (a: number, b: number) => `${a} : ${b}`,
+    seriesReopened: (a: number, b: number) =>
+      `Korrigiert - die Serie steht ${a} : ${b} und braucht noch einen Satz.`,
   },
   players: {
     title: 'Spieler',

@@ -2,6 +2,7 @@ import type { Match, MatchStage, Player, Tournament } from '../src/domain/types'
 import { DEFAULT_ELO_SETTINGS, DEFAULT_PLAY_SETTINGS } from '../src/domain/types';
 import type { BracketMatchDraft } from '../src/domain/pairing/elimination';
 import type { PlannedMatch } from '../src/domain/pairing/utils';
+import { gamesWon } from '../src/domain/bestOf';
 
 let idCounter = 0;
 export function resetIds(): void {
@@ -108,12 +109,10 @@ export function draftToMatch(draft: BracketMatchDraft): Match {
     scoreA: draft.scoreA,
     scoreB: draft.scoreB,
     status: draft.status,
-    // Bracket matches are always bo3 in the real app (src/db/repo.ts).
+    // Bracket matches are always bo3 in the real app (src/db/repo.ts), and a
+    // freshly planned bracket has no games yet.
     format: 'bo3',
-    games:
-      draft.scoreA != null && draft.scoreB != null
-        ? [{ scoreA: draft.scoreA, scoreB: draft.scoreB }]
-        : [],
+    games: [],
     bye: draft.bye,
     createdAt: sequence,
     playedAt: null,
@@ -148,15 +147,29 @@ export function makeTournament(overrides: Partial<Tournament> = {}): Tournament 
 }
 
 /** Records a result on a bracket match; the caller re-resolves afterwards. */
+/**
+ * Decides a match outright with this game score: a bo1 is that one game, a
+ * bo3 a straight 2:0 sweep of it (so its top-level score is the tally, as
+ * setMatchResult would store it).
+ */
 export function recordResult(
   matches: Match[],
   matchId: string,
   scoreA: number,
   scoreB: number,
 ): Match[] {
-  return matches.map((match) =>
-    match.id === matchId
-      ? { ...match, scoreA, scoreB, status: 'done' as const, playedAt: Date.now() }
-      : match,
-  );
+  return matches.map((match) => {
+    if (match.id !== matchId) return match;
+    const game = { scoreA, scoreB };
+    const games = match.format === 'bo3' ? [game, game] : [game];
+    const tally = gamesWon(games);
+    return {
+      ...match,
+      games,
+      scoreA: match.format === 'bo3' ? tally.a : scoreA,
+      scoreB: match.format === 'bo3' ? tally.b : scoreB,
+      status: 'done' as const,
+      playedAt: Date.now(),
+    };
+  });
 }

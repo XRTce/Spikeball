@@ -185,7 +185,46 @@ describe('single elimination', () => {
     const final = state.find((m) => m.id === finalId)!;
     expect(final.scoreA).toBeNull();
     expect(final.scoreB).toBeNull();
+    expect(final.games).toEqual([]);
     expect(final.status).toBe('scheduled');
+  });
+
+  it('discards the games of a series still in progress when its teams change', () => {
+    const { matches } = build(4);
+    const semiA = matches.find((m) => m.round === 1 && m.order === 0)!;
+    const semiB = matches.find((m) => m.round === 1 && m.order === 1)!;
+
+    let state = resolveBracket(recordResult(matches, semiA.id, 21, 10));
+    state = resolveBracket(recordResult(state, semiB.id, 21, 10));
+    const finalId = state.find((m) => m.round === 2)!.id;
+    // One game of the final is in; the series is not decided, so it has no score yet.
+    state = state.map((m) => (m.id === finalId ? { ...m, games: [{ scoreA: 21, scoreB: 0 }] } : m));
+    expect(resolveBracket(state).find((m) => m.id === finalId)!.games).toHaveLength(1);
+
+    // Flip the first semi: that game was played by the team that just lost it.
+    state = resolveBracket(recordResult(state, semiA.id, 10, 21));
+    const final = state.find((m) => m.id === finalId)!;
+    expect(final.teamA.length).toBeGreaterThan(0);
+    expect(final.games).toEqual([]);
+    expect(final.status).toBe('scheduled');
+  });
+
+  it('never leaves a match holding games from a pairing other than its current one', () => {
+    // Property over every single-semi flip in brackets of 4 to 8 teams: a
+    // match whose teams moved has no games left from before the move.
+    for (const count of [4, 5, 6, 8]) {
+      const { teams, matches } = build(count, count >= 4);
+      const played = playOut(matches, teams);
+      for (const flip of played.filter((m) => m.round === 1 && !m.bye)) {
+        const before = new Map(played.map((m) => [m.id, [m.teamA.join(','), m.teamB.join(',')].join('|')]));
+        const aWon = flip.scoreA! > flip.scoreB!;
+        const after = resolveBracket(recordResult(played, flip.id, aWon ? 10 : 21, aWon ? 21 : 10));
+        for (const match of after) {
+          const moved = before.get(match.id) !== [match.teamA.join(','), match.teamB.join(',')].join('|');
+          if (moved) expect(match.games).toEqual([]);
+        }
+      }
+    }
   });
 });
 

@@ -42,8 +42,12 @@ export function roundDelta(value: number): number {
   return value >= 0 ? Math.floor(value + 0.5) : -Math.floor(-value + 0.5);
 }
 
-export function kFactorFor(matchesPlayed: number, settings: EloSettings): number {
-  return matchesPlayed < settings.provisionalMatches
+/**
+ * Provisional K until a player has `provisionalMatches` rated games behind
+ * them. Every game of a bo3 is one rated game, as in chess rating lists.
+ */
+export function kFactorFor(gamesPlayed: number, settings: EloSettings): number {
+  return gamesPlayed < settings.provisionalMatches
     ? settings.kFactorProvisional
     : settings.kFactor;
 }
@@ -54,13 +58,13 @@ export interface MatchRatingInput {
   scoreA: number;
   scoreB: number;
   ratings: Readonly<Record<string, number>>;
-  matchesPlayed: Readonly<Record<string, number>>;
+  gamesPlayed: Readonly<Record<string, number>>;
   settings: EloSettings;
 }
 
-/** Rating change per player for a single completed match. */
+/** Rating change per player for a single rated game: a bo1, or one game of a bo3. */
 export function computeMatchDeltas(input: MatchRatingInput): Record<string, number> {
-  const { teamA, teamB, scoreA, scoreB, ratings, matchesPlayed, settings } = input;
+  const { teamA, teamB, scoreA, scoreB, ratings, gamesPlayed, settings } = input;
   const deltas: Record<string, number> = {};
   if (teamA.length === 0 || teamB.length === 0) return deltas;
 
@@ -77,11 +81,11 @@ export function computeMatchDeltas(input: MatchRatingInput): Record<string, numb
   }
 
   for (const id of teamA) {
-    const k = kFactorFor(matchesPlayed[id] ?? 0, settings);
+    const k = kFactorFor(gamesPlayed[id] ?? 0, settings);
     deltas[id] = roundDelta(k * multiplier * (actualA - expectedA));
   }
   for (const id of teamB) {
-    const k = kFactorFor(matchesPlayed[id] ?? 0, settings);
+    const k = kFactorFor(gamesPlayed[id] ?? 0, settings);
     deltas[id] = roundDelta(k * multiplier * (expectedA - actualA));
   }
   return deltas;
@@ -99,15 +103,24 @@ export interface EloHistoryPoint {
 export interface EloReplay {
   /** Final rating per player id. */
   ratings: Record<string, number>;
-  /** Rated matches per player id (byes excluded). */
-  matchesPlayed: Record<string, number>;
+  /**
+   * Rated games per player id (byes excluded); drives the provisional
+   * K-factor. A bo3 counts each of its games, so this is not the number of
+   * matches played - the standings hold that.
+   */
+  gamesPlayed: Record<string, number>;
   /** Chronological rating points, base rating first. */
   history: EloHistoryPoint[];
   /** Per-match audit of the ratings before the match and the applied delta. */
   perMatch: Record<string, { before: Record<string, number>; delta: Record<string, number> }>;
 }
 
-/** Matches that actually move ratings: finished, not a bye, both teams present. */
+/**
+ * Decided matches: finished, not a bye, both teams present. This is the unit
+ * standings, head-to-head and pairing history count. Ratings move earlier -
+ * see `hasRatableGames` - so a bo3 in progress already changes a rating but
+ * is not a played match yet.
+ */
 export function isRatedMatch(match: Match): boolean {
   return (
     match.status === 'done' &&
@@ -157,8 +170,8 @@ function flattenRatedGames(matches: Match[]): RatedGameUnit[] {
 }
 
 /**
- * Recomputes every rating from the players' base ratings by replaying all
- * finished matches in order.
+ * Recomputes every rating from the players' base ratings by replaying every
+ * recorded game, in match order.
  *
  * The app never mutates a rating in place: entering, editing or deleting a
  * result triggers a full replay. That keeps ratings consistent no matter how
@@ -171,13 +184,13 @@ export function replayElo(
   settings: EloSettings,
 ): EloReplay {
   const ratings: Record<string, number> = {};
-  const matchesPlayed: Record<string, number> = {};
+  const gamesPlayed: Record<string, number> = {};
   const history: EloHistoryPoint[] = [];
   const perMatch: EloReplay['perMatch'] = {};
 
   for (const player of players) {
     ratings[player.id] = player.baseElo;
-    matchesPlayed[player.id] = 0;
+    gamesPlayed[player.id] = 0;
     history.push({
       playerId: player.id,
       matchId: null,
@@ -205,7 +218,7 @@ export function replayElo(
       scoreA: unit.scoreA,
       scoreB: unit.scoreB,
       ratings,
-      matchesPlayed,
+      gamesPlayed,
       settings,
     });
 
@@ -218,7 +231,7 @@ export function replayElo(
       const delta = deltas[id] ?? 0;
       const after = before[id]! + delta;
       ratings[id] = after;
-      matchesPlayed[id] = (matchesPlayed[id] ?? 0) + 1;
+      gamesPlayed[id] = (gamesPlayed[id] ?? 0) + 1;
       history.push({
         playerId: id,
         matchId: unit.matchId,
@@ -233,10 +246,10 @@ export function replayElo(
     perMatch[unit.matchId] = { before: matchBefore, delta: matchDelta };
   }
 
-  return { ratings, matchesPlayed, history, perMatch };
+  return { ratings, gamesPlayed, history, perMatch };
 }
 
-/** Rating curve per player: base rating followed by the rating after each match. */
+/** Rating curve per player: base rating followed by the rating after each rated game. */
 export function eloSeries(replay: EloReplay, playerIds: string[]): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   for (const id of playerIds) out[id] = [];

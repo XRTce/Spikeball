@@ -12,7 +12,7 @@ import {
   type Tournament,
 } from '../domain/types';
 import { replayElo } from '../domain/elo';
-import { gamesWon, isSeriesDecided } from '../domain/bestOf';
+import { defaultGameIndex, recordGame } from '../domain/bestOf';
 import {
   bracketResult,
   buildSingleElimination,
@@ -52,10 +52,6 @@ export function listPlayers(tournamentId: string): Promise<Player[]> {
 
 export function listMatches(tournamentId: string): Promise<Match[]> {
   return db.matches.where('tournamentId').equals(tournamentId).toArray();
-}
-
-export function getMatch(matchId: string): Promise<Match | undefined> {
-  return db.matches.get(matchId);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -366,61 +362,42 @@ export const recordCasualResult = command(
 );
 
 /**
- * Records the next game of a match. Bo1 always decides the match on the
- * first call; bo3 appends the game and only marks the match `done` - with
- * the games-won tally as scoreA/scoreB - once a side has won 2 games. Each
- * recorded game is its own Elo event via `recalculate` regardless of whether
- * the series as a whole is decided yet.
- *
- * Correcting an already-decided match (the edit pencil) replaces its last
- * game instead of appending one; if that correction undoes the winning
- * game, the match reopens and asks for the next game again.
+ * Records one game of a match - the rules are `recordGame` in
+ * domain/bestOf.ts. Without `gameIndex` the score goes where the result
+ * sheet puts it by default: the next game of an open series, or the last
+ * game of a decided one (the edit pencil). A bo1 is decided by its one
+ * game; a bo3 only becomes `done`, with the games-won tally as
+ * scoreA/scoreB, once a side has won 2 games. Each recorded game is its own
+ * Elo event via `recalculate`, whether or not the series is decided yet.
  */
 async function setMatchResultImpl(
   matchId: string,
   scoreA: number,
   scoreB: number,
+  gameIndex?: number,
 ): Promise<{ decided: boolean }> {
   const match = await db.matches.get(matchId);
   if (!match) return { decided: false };
 
-  const games =
-    match.status === 'done' && match.games.length > 0
-      ? [...match.games.slice(0, -1), { scoreA, scoreB }]
-      : [...match.games, { scoreA, scoreB }];
-  const decided = isSeriesDecided(match.format, games);
+  const outcome = recordGame(match, gameIndex ?? defaultGameIndex(match), scoreA, scoreB);
 
   await db.transaction('rw', db.matches, async () => {
     const siblings = await db.matches.where('tournamentId').equals(match.tournamentId).toArray();
     // A result keeps the position it first got, so correcting a score never
     // reshuffles the rating history of everything played afterwards.
     const sequence = match.sequence > 0 ? match.sequence : nextSequence(siblings);
-    if (decided) {
-      // Bo1's top-level score stays the real points of its one game; only a
-      // bo3 aggregates to the games-won tally (e.g. 2:1).
-      const finalScore = match.format === 'bo3' ? gamesWon(games) : { a: scoreA, b: scoreB };
-      await db.matches.update(matchId, {
-        games,
-        scoreA: finalScore.a,
-        scoreB: finalScore.b,
-        status: 'done',
-        playedAt: match.playedAt ?? Date.now(),
-        sequence,
-      });
-    } else {
-      await db.matches.update(matchId, {
-        games,
-        scoreA: null,
-        scoreB: null,
-        status: 'scheduled',
-        playedAt: null,
-        sequence,
-      });
-    }
+    await db.matches.update(matchId, {
+      games: outcome.games,
+      scoreA: outcome.scoreA,
+      scoreB: outcome.scoreB,
+      status: outcome.decided ? 'done' : 'scheduled',
+      playedAt: outcome.decided ? (match.playedAt ?? Date.now()) : null,
+      sequence,
+    });
   });
 
   await recalculate(match.tournamentId);
-  return { decided };
+  return { decided: outcome.decided };
 }
 export const setMatchResult = command('setMatchResult', matchTournamentId, setMatchResultImpl);
 
@@ -636,6 +613,13 @@ async function touch(tournamentId: string): Promise<void> {
   await db.tournaments.update(tournamentId, { updatedAt: Date.now() });
 }
 
+function sameGames(a: Match['games'], b: Match['games']): boolean {
+  return (
+    a.length === b.length &&
+    a.every((game, i) => game.scoreA === b[i]!.scoreA && game.scoreB === b[i]!.scoreB)
+  );
+}
+
 function matchesDiffer(a: Match, b: Match): boolean {
   return (
     a.teamA.join(',') !== b.teamA.join(',') ||
@@ -645,6 +629,8 @@ function matchesDiffer(a: Match, b: Match): boolean {
     a.status !== b.status ||
     a.bye !== b.bye ||
     a.playedAt !== b.playedAt ||
+    a.format !== b.format ||
+    !sameGames(a.games, b.games) ||
     a.feedsWinnerTo?.matchId !== b.feedsWinnerTo?.matchId ||
     a.feedsLoserTo?.matchId !== b.feedsLoserTo?.matchId
   );

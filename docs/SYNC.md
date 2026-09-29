@@ -36,6 +36,12 @@ the app and by the server, so neither side can drift.
 `Tournament.visibility: 'local' | 'public'` is shared data and part of the
 snapshot. Dexie schema v2 adds it to existing rows as `'local'`.
 
+Match `format` and `games` (bo1/bo3) came after public tournaments, so the
+server may hold snapshots without them and devices on an older build keep
+pushing them without. The server accepts that, and every snapshot written to a
+device is brought to the current shape first - see ARCHITECTURE.md, "Adding
+bo1/bo3".
+
 Device-only bookkeeping lives in a new Dexie table `sync`, one `SyncRow` per
 public tournament (`src/db/db.ts`):
 

@@ -63,14 +63,16 @@ export function protectedChanges(before: ProtectionInput, after: ProtectionInput
 
   const afterMatches = new Map(after.matches.map((match) => [match.id, match]));
   for (const match of before.matches) {
-    // A bo3 with at least one game recorded already has a rated result, even
-    // before the series itself is decided - deleting or clearing it needs
-    // the password just as much as a finished match would.
+    // Any recorded game is a rated result, whether or not its series is
+    // decided yet - deleting or clearing it needs the password.
     if (match.games.length === 0 || match.bye) continue;
     const next = afterMatches.get(match.id);
-    // A played match whose teams changed was re-routed by the bracket after an
-    // earlier result was corrected; that is a consequence, not a deletion.
-    if (!next || (next.status !== 'done' && sameTeams(match, next))) {
+    // Only losing every game is a deletion. Entering the next game keeps a
+    // bo3 on court, and a correction may reopen or shorten a series - both
+    // are as free as correcting a score always was. A played match whose
+    // teams changed was re-routed by the bracket after an earlier result was
+    // corrected; that is a consequence, not a deletion.
+    if (!next || (next.games.length === 0 && sameTeams(match, next))) {
       reasons.add('delete_result');
     }
   }

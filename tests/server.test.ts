@@ -7,6 +7,7 @@ import { createApp, type App } from '../server/app';
 import { RateLimiter } from '../server/rateLimit';
 import { PASSWORD_HEADER, type ApiErrorBody, type TournamentSnapshot } from '../src/sync/protocol';
 import { makePlayer, makeTournament, playedMatch } from './helpers';
+import type { Match } from '../src/domain/types';
 
 /* -------------------------------------------------------------------------- */
 /* Test scaffolding                                                            */
@@ -28,6 +29,14 @@ afterEach(async () => {
   if (app) await app.close();
   app = null;
 });
+
+/** A match the way a client from before bo1/bo3 support sends it. */
+function withoutBestOf(match: Match): Match {
+  const legacy: Record<string, unknown> = { ...match };
+  delete legacy.format;
+  delete legacy.games;
+  return legacy as unknown as Match;
+}
 
 function snapshotFor(id: string, overrides: Partial<TournamentSnapshot> = {}): TournamentSnapshot {
   return {
@@ -319,6 +328,58 @@ describe('locked changes', () => {
     const withResult = { ...snapshot, matches: [match] };
     const res = await push(id, 1, ['c1'], withResult);
     expect(res.status).toBe(200);
+  });
+
+  it('checks a protected tournament stored before bo1/bo3 support without failing', async () => {
+    const { id, snapshot, alice, bob } = await seedProtected();
+    const played = playedMatch([alice.id], [bob.id], 21, 15, { tournamentId: id });
+    // A client that predates bo1/bo3 stored its result without format/games.
+    const stored = await push(id, 1, ['c1'], { ...snapshot, matches: [withoutBestOf(played)] });
+    expect(stored.status).toBe(200);
+
+    // An updated client pushes the same result in the new shape: no change.
+    const same = await push(id, 2, ['c2'], { ...snapshot, matches: [played] });
+    expect(same.status).toBe(200);
+
+    // Deleting that result still needs the password.
+    const deleted = await push(id, 3, ['c3'], { ...snapshot, matches: [] });
+    expect(deleted.status).toBe(403);
+    expect((deleted.body as ApiErrorBody).reasons).toContain('delete_result');
+  });
+
+  it('still asks for the password when a client that predates bo1/bo3 clears a result', async () => {
+    const { id, snapshot, alice, bob } = await seedProtected();
+    const played = playedMatch([alice.id], [bob.id], 21, 15, { tournamentId: id });
+    expect((await push(id, 1, ['c1'], { ...snapshot, matches: [played] })).status).toBe(200);
+
+    // The old build resets the score and status but knows nothing of `games`.
+    const cleared = { ...played, scoreA: null, scoreB: null, status: 'scheduled' as const, playedAt: null };
+    const res = await push(id, 2, ['c2'], { ...snapshot, matches: [cleared] });
+    expect(res.status).toBe(403);
+    expect((res.body as ApiErrorBody).reasons).toContain('delete_result');
+  });
+});
+
+describe('bo1/bo3 fields', () => {
+  beforeEach(() => start());
+
+  it('accepts matches from a client that predates them', async () => {
+    const id = randomUUID();
+    const alice = makePlayer('alice', 1000, { tournamentId: id });
+    const bob = makePlayer('bob', 1000, { tournamentId: id });
+    const match = withoutBestOf(playedMatch([alice.id], [bob.id], 21, 15, { tournamentId: id }));
+    const res = await createTournament(snapshotFor(id, { players: [alice, bob], matches: [match] }));
+    expect(res.status).toBe(201);
+  });
+
+  it('still rejects them when present but invalid', async () => {
+    const game = { scoreA: 21, scoreB: 15 };
+    for (const invalid of [{ format: 'bo5' }, { games: [game, game, game, game] }, { games: [{ scoreA: 21 }] }]) {
+      const id = randomUUID();
+      const match = { ...playedMatch(['alice'], ['bob'], 21, 15, { tournamentId: id }), ...invalid };
+      const res = await createTournament(snapshotFor(id, { matches: [match as unknown as Match] }));
+      expect(res.status).toBe(400);
+    }
   });
 });
 

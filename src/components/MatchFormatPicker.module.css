@@ -1,0 +1,11 @@
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.control {
+  flex: 0 1 12rem;
+  min-width: 0;
+}

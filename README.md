@@ -32,6 +32,7 @@ aufs Handy und kann Ergebnisse eintragen. Mehr dazu in
 | **Liga-Modus** | Dauerhaftes freies Spiel: Die App schlägt die nächste faire Partie vor, oder du stellst die Teams selbst zusammen. Wer am wenigsten gespielt hat kommt zuerst, Partnerschaften rotieren. |
 | **Turniermodus** | Freies Spiel mit Zeitlimit. Danach draften die besten Spieler feste Teams &mdash; die bessere Hälfte wählt sich reihum einen Partner aus der schwächeren &mdash; und spielen ein K.o.-Bracket. |
 | **Elo pro Turnier** | Jeder Spieler hat eine Start-Elo, die sich mit jedem Ergebnis fortschreibt. Wertungen gehören zum Turnier, nicht global. |
+| **Bo1 oder Bo3** | Freie Spiele gehen über einen Satz oder Best of 3, K.o.-Spiele immer Best of 3. Die Sätze werden einzeln eingetragen, jeder zählt für die Elo, und nach zwei gewonnenen Sätzen ist die Serie entschieden. |
 | **Spieler übernehmen** | Ein neues Turnier kann die Spielerliste eines alten klonen &mdash; mit der aktuellen oder der ursprünglichen Wertung als neue Start-Elo. |
 | **Ergebnisbild** | Podium, Elo-Verlauf und Siegbilanz als PNG zum Teilen. |
 | **Öffentliche Turniere** | Beim Anlegen *Öffentlich* wählen, QR-Code zeigen, fertig: Wer ihn scannt, hat das Turnier live auf dem eigenen Handy und kann Ergebnisse eintragen, Spiele ansetzen und Spieler hinzufügen. Kein Account, der Link ist der Schlüssel. |
@@ -171,6 +172,7 @@ Passwort kennt, entsperrt sein Handy einmal unter *Mehr*.
 src/
 ├── domain/          Reine Spiellogik, ohne UI und ohne Datenbank
 │   ├── elo.ts       Elo-Berechnung und Replay
+│   ├── bestOf.ts    Bo1/Bo3: Sätze eintragen, korrigieren, Serie entscheiden
 │   ├── standings.ts Tabelle und Bilanzen
 │   ├── schedule.ts  Gruppierung des Spielplans in Runden
 │   └── pairing/     Auslosung: Balance, freies Spiel, Kapitaens-Draft, K.o.

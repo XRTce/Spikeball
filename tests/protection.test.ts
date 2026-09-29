@@ -161,6 +161,26 @@ describe('everyday actions need no password', () => {
   });
 });
 
+describe('entering and correcting the games of a bo3 needs no password', () => {
+  it('the next game of a running series, including one that leaves it at 1:1', async () => {
+    const { tournamentId, playerIds: [a, b, c, d] } = await seed(4);
+    const match = await scheduleCasualMatch(tournamentId, [a!, b!], [c!, d!], 'bo3');
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 21, 17))).toEqual([]);
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 17, 21))).toEqual([]);
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 21, 19))).toEqual([]);
+  });
+
+  it('a correction of an earlier game, or one that reopens a decided series', async () => {
+    const { tournamentId, playerIds: [a, b, c, d] } = await seed(4);
+    const match = await scheduleCasualMatch(tournamentId, [a!, b!], [c!, d!], 'bo3');
+    await setMatchResult(match, 21, 17);
+    await setMatchResult(match, 21, 15);
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 21, 10, 0))).toEqual([]);
+    // Undoing the deciding win puts the match back on court: still a correction.
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 15, 21, 1))).toEqual([]);
+  });
+});
+
 describe('destructive actions need the password', () => {
   it('deleting a player', async () => {
     const { tournamentId, playerIds: [a] } = await seed(4);
