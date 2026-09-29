@@ -34,7 +34,7 @@ Only three things are stored:
 |---|---|
 | `tournaments` | Name, phase, format, Elo and play settings, bracket metadata |
 | `players` | Name, **base rating**, active flag, and a denormalised current rating |
-| `matches` | Teams, scores, stage/round/order, bracket wiring |
+| `matches` | Teams, format (bo1/bo3) with the score of every game plus the match score, stage/round/order, bracket wiring |
 
 Everything else — current ratings, standings, who has partnered whom, bracket
 progression, the podium — is computed on demand from
@@ -139,8 +139,31 @@ open, and `importBackup` runs the same rules from `db/normalize.ts`:
   matches are always doubles, and turning a single into a pair would mean
   making up a partner.
 
-Public tournaments need no migration: they were added after the format
-removal, so no public row can have the old shape.
+Public tournaments need none of this: they were added after the format
+removal, so no public row can have the pre-single-elim shape. The bo1/bo3
+fields below are a different story.
+
+### Adding bo1/bo3
+
+Dexie `version(4)` gave every match a `format` and a `games` log. A row from
+before is a bo1 whose one game is its recorded score; `withBestOfFields` in
+`domain/bestOf.ts` is that rule. It also repairs what a client still on the
+old build leaves behind when it edits a current row without knowing about
+`games`: a finished row with an empty game log (it entered a score) and an
+unfinished row whose games decide the series (it cleared one - so clearing
+still counts as deleting a result for the password rule). Unlike the v3 rules
+it has to run wherever match rows come in, because public tournaments predate
+it:
+
+- the Dexie v4 upgrade and backup import (via `normalizeMatch`);
+- every write of a server snapshot to the device - pull, join and replay all
+  go through `writeSnapshotRows` - since the server keeps whatever was pushed,
+  including snapshots stored before the update;
+- on the server, before the password rule compares two snapshots.
+
+The server accepts matches without the two fields (and validates them when
+present), so a phone that has not picked up the update yet keeps syncing
+instead of being rejected.
 
 ## Rendering choices worth knowing
 
@@ -208,7 +231,9 @@ adding a second file with the same shape and switching the export in
 - **`draft.test.ts`** — the captain's draft split and turn order.
 - **`elimination.test.ts`** — seeding order, bye propagation, that a
   third-place match only appears with at least 4 teams, and that correcting an
-  early result invalidates the right downstream scores.
+  early result invalidates the right downstream scores and games.
+- **`bestOf.test.ts`** — the series rules: bo1/bo3 decisions, corrections that
+  reopen or shorten a series, and the invariants over random entry sequences.
 - **`repo.test.ts`** — the database layer end to end against `fake-indexeddb`,
   including cloning between tournaments, the timed-mode draft bracket, and
   backup round-trips.

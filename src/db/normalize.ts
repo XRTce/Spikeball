@@ -7,6 +7,7 @@ import {
   type Tournament,
   type TournamentFormat,
 } from '../domain/types';
+import { withBestOfFields } from '../domain/bestOf';
 
 /**
  * Shape normalisation shared by the Dexie v3 upgrade (db.ts) and backup
@@ -114,6 +115,7 @@ export function normalizeMatch(raw: Row, options: NormalizeRowOptions): Match | 
   next.feedsLoserTo = raw.feedsLoserTo ?? null;
   next.labelA = raw.labelA ?? null;
   next.labelB = raw.labelB ?? null;
+  Object.assign(next, withBestOfFields(raw));
 
   const wasCasual = raw.stage === 'casual';
   const flatten = options.tournamentReverted || !CURRENT_STAGES.has(raw.stage as string);

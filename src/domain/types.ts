@@ -10,6 +10,14 @@ export type MatchStage = 'casual' | 'winners' | 'third_place';
 
 export type MatchStatus = 'scheduled' | 'done';
 
+/** `bo1` = single game decides the match; `bo3` = first to 2 game wins. */
+export type MatchFormat = 'bo1' | 'bo3';
+
+export interface MatchGame {
+  scoreA: number;
+  scoreB: number;
+}
+
 export type Slot = 'A' | 'B';
 
 export interface EloSettings {
@@ -120,9 +128,13 @@ export interface Match {
   order: number;
   teamA: string[];
   teamB: string[];
+  /** Bo1: the single game's points. Bo3: games won per side once decided, null while the series is still open. */
   scoreA: number | null;
   scoreB: number | null;
   status: MatchStatus;
+  format: MatchFormat;
+  /** Individual game results in play order; each entry is its own Elo event. */
+  games: MatchGame[];
   /** Walkover: counted for progression but never for Elo. */
   bye: boolean;
   createdAt: number;

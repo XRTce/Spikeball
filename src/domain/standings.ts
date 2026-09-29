@@ -54,10 +54,16 @@ export function buildStandings(
     const scoreA = match.scoreA!;
     const scoreB = match.scoreB!;
     const aWon = scoreA > scoreB;
+    // Points come from the individual games, not the top-level score: for a
+    // bo3 that score is the games-won tally (e.g. 2:1), not real points.
+    const points = match.games.reduce(
+      (acc, game) => ({ a: acc.a + game.scoreA, b: acc.b + game.scoreB }),
+      { a: 0, b: 0 },
+    );
 
     for (const [team, own, other, won] of [
-      [match.teamA, scoreA, scoreB, aWon] as const,
-      [match.teamB, scoreB, scoreA, !aWon] as const,
+      [match.teamA, points.a, points.b, aWon] as const,
+      [match.teamB, points.b, points.a, !aWon] as const,
     ]) {
       for (const id of team) {
         const row = rows.get(id);

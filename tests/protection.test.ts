@@ -68,12 +68,16 @@ function pairs(ids: string[]) {
   return teams;
 }
 
+/** Plays the first open match to a finish - two straight games for bracket bo3s, one for casual bo1s. */
 async function playOne(tournamentId: string) {
   const open = (await listMatches(tournamentId)).find(
     (match) => match.status === 'scheduled' && match.teamA.length > 0 && match.teamB.length > 0,
   );
   if (!open) throw new Error('nothing to play');
-  await setMatchResult(open.id, 21, 15);
+  let decided = false;
+  while (!decided) {
+    ({ decided } = await setMatchResult(open.id, 21, 15));
+  }
   return open.id;
 }
 
@@ -126,7 +130,11 @@ describe('everyday actions need no password', () => {
       .filter((match) => match.round === 1 && !match.bye)
       .sort((a, b) => a.order - b.order);
     expect(quarters).toHaveLength(4);
-    for (const quarter of quarters) await setMatchResult(quarter.id, 21, 15);
+    // Bracket matches are bo3 - two straight games decide each one.
+    for (const quarter of quarters) {
+      await setMatchResult(quarter.id, 21, 15);
+      await setMatchResult(quarter.id, 21, 15);
+    }
     const first = quarters[0]!.id;
 
     // Play the semi-final the first quarter-final's winner went into.
@@ -136,12 +144,40 @@ describe('everyday actions need no password', () => {
     );
     expect(semi?.teamA.length).toBeGreaterThan(0);
     await setMatchResult(semi!.id, 21, 12);
+    await setMatchResult(semi!.id, 21, 12);
 
     // Flipping a quarter-final changes who is in the semi-final, which
-    // invalidates its result. That follows from an allowed correction.
-    expect(await reasonsFor(tournamentId, () => setMatchResult(first, 5, 21))).toEqual([]);
+    // invalidates its result. That follows from an allowed correction: two
+    // corrected games (bo3) flip the quarter-final's winner outright rather
+    // than merely reopening it, so this never looks like a deleted result.
+    expect(
+      await reasonsFor(tournamentId, async () => {
+        await setMatchResult(first, 5, 21);
+        await setMatchResult(first, 5, 21);
+      }),
+    ).toEqual([]);
     const after = (await listMatches(tournamentId)).find((match) => match.id === semi!.id);
     expect(after?.status).not.toBe('done');
+  });
+});
+
+describe('entering and correcting the games of a bo3 needs no password', () => {
+  it('the next game of a running series, including one that leaves it at 1:1', async () => {
+    const { tournamentId, playerIds: [a, b, c, d] } = await seed(4);
+    const match = await scheduleCasualMatch(tournamentId, [a!, b!], [c!, d!], 'bo3');
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 21, 17))).toEqual([]);
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 17, 21))).toEqual([]);
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 21, 19))).toEqual([]);
+  });
+
+  it('a correction of an earlier game, or one that reopens a decided series', async () => {
+    const { tournamentId, playerIds: [a, b, c, d] } = await seed(4);
+    const match = await scheduleCasualMatch(tournamentId, [a!, b!], [c!, d!], 'bo3');
+    await setMatchResult(match, 21, 17);
+    await setMatchResult(match, 21, 15);
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 21, 10, 0))).toEqual([]);
+    // Undoing the deciding win puts the match back on court: still a correction.
+    expect(await reasonsFor(tournamentId, () => setMatchResult(match, 15, 21, 1))).toEqual([]);
   });
 });
 
@@ -157,6 +193,23 @@ describe('destructive actions need the password', () => {
     const two = await recordCasualResult(tournamentId, [a!, c!], [b!, d!], 21, 17);
 
     expect(await reasonsFor(tournamentId, () => clearMatchResult(one))).toEqual(['delete_result']);
+    expect(await reasonsFor(tournamentId, () => deleteMatch(two))).toEqual(['delete_result']);
+  });
+
+  it('deleting or clearing a bo3 that is still mid-series', async () => {
+    // The first game of a bo3 already moved ratings even though the series
+    // itself is not decided yet (status stays 'scheduled') - losing it needs
+    // the password just like a finished result would.
+    const { tournamentId, playerIds: [a, b, c, d] } = await seed(4);
+    const one = await scheduleCasualMatch(tournamentId, [a!, b!], [c!, d!], 'bo3');
+    await setMatchResult(one, 21, 17);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === one);
+    expect(match?.status).toBe('scheduled');
+
+    expect(await reasonsFor(tournamentId, () => clearMatchResult(one))).toEqual(['delete_result']);
+
+    const two = await scheduleCasualMatch(tournamentId, [a!, c!], [b!, d!], 'bo3');
+    await setMatchResult(two, 21, 17);
     expect(await reasonsFor(tournamentId, () => deleteMatch(two))).toEqual(['delete_result']);
   });
 

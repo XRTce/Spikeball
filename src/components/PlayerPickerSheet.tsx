@@ -3,7 +3,8 @@ import { Avatar, Button, Sheet } from '../ui';
 import { cx } from '../lib/cx';
 import { strings } from '../i18n';
 import { usePlayerColors } from '../state/playerColors';
-import type { Player } from '../domain/types';
+import type { MatchFormat, Player } from '../domain/types';
+import { MatchFormatPicker } from './MatchFormatPicker';
 import css from './PlayerGrid.module.css';
 
 type Assignment = 'A' | 'B';
@@ -20,6 +21,8 @@ export function PlayerPickerSheet({
   players,
   ratings,
   teamSize,
+  format,
+  onFormatChange,
   onConfirm,
 }: {
   open: boolean;
@@ -27,6 +30,8 @@ export function PlayerPickerSheet({
   players: Player[];
   ratings: Readonly<Record<string, number>>;
   teamSize: number;
+  format: MatchFormat;
+  onFormatChange: (format: MatchFormat) => void;
   onConfirm: (teamA: string[], teamB: string[]) => void | Promise<void>;
 }) {
   const colors = usePlayerColors();
@@ -83,35 +88,38 @@ export function PlayerPickerSheet({
         </>
       }
     >
-      <div className={css.pickerGrid}>
-        {players.map((player) => {
-          const assignment = assignments[player.id];
-          return (
-            <button
-              key={player.id}
-              type="button"
-              aria-pressed={assignment !== undefined}
-              className={cx(
-                css.pickerItem,
-                assignment === 'A' && css.pickerSelected,
-                assignment === 'B' && css.pickerTeamB,
-              )}
-              onClick={() => cycle(player.id)}
-            >
-              <Avatar name={player.name} seed={player.id} size={28} color={colors.varOf(player.id)} />
-              <span className={css.pickerName}>
-                {player.name}
-                {assignment && <span className={css.pickerTeamBadge}>{assignment}</span>}
-                <br />
-                <span className={css.pickerElo}>
-                  {ratings[player.id] ?? player.elo} {strings.common.elo}
+      <div className={css.pickerBody}>
+        <MatchFormatPicker value={format} onChange={onFormatChange} />
+        <div className={css.pickerGrid}>
+          {players.map((player) => {
+            const assignment = assignments[player.id];
+            return (
+              <button
+                key={player.id}
+                type="button"
+                aria-pressed={assignment !== undefined}
+                className={cx(
+                  css.pickerItem,
+                  assignment === 'A' && css.pickerSelected,
+                  assignment === 'B' && css.pickerTeamB,
+                )}
+                onClick={() => cycle(player.id)}
+              >
+                <Avatar name={player.name} seed={player.id} size={28} color={colors.varOf(player.id)} />
+                <span className={css.pickerName}>
+                  {player.name}
+                  {assignment && <span className={css.pickerTeamBadge}>{assignment}</span>}
+                  <br />
+                  <span className={css.pickerElo}>
+                    {ratings[player.id] ?? player.elo} {strings.common.elo}
+                  </span>
                 </span>
-              </span>
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
+        {players.length === 0 && <p className={css.pickerCount}>{strings.players.empty}</p>}
       </div>
-      {players.length === 0 && <p className={css.pickerCount}>{strings.players.empty}</p>}
     </Sheet>
   );
 }

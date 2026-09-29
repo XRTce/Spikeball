@@ -23,7 +23,7 @@ export interface TournamentView {
   teamSize: number;
 }
 
-const EMPTY_REPLAY: EloReplay = { ratings: {}, matchesPlayed: {}, history: [], perMatch: {} };
+const EMPTY_REPLAY: EloReplay = { ratings: {}, gamesPlayed: {}, history: [], perMatch: {} };
 
 /**
  * Single read model for a tournament screen.

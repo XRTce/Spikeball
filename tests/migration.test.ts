@@ -204,7 +204,7 @@ describe('Dexie v3 upgrade of a pre-refactor database', () => {
   afterEach(() => db.close());
 
   it('opens at the current version with every tournament in the current shape', async () => {
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
     const all = await listTournaments();
     expect(all).toHaveLength(5);
     for (const t of all) expectCurrentShape(t);
@@ -304,11 +304,88 @@ describe('Dexie v3 upgrade of a pre-refactor database', () => {
     expect(players.find((p) => p.id === 'p8')!.elo).toBeLessThan(1000);
   });
 
+  it('turns every surviving match into a bo1 whose one game is its recorded score', async () => {
+    for (const t of await listTournaments()) {
+      for (const match of await listMatches(t.id)) {
+        expect(match.format).toBe('bo1');
+        expect(match.games).toEqual(
+          match.status === 'done' && match.scoreA !== null && match.scoreB !== null
+            ? [{ scoreA: match.scoreA, scoreB: match.scoreB }]
+            : [],
+        );
+      }
+    }
+  });
+
   it('leaves a casual tournament alone apart from the shape', async () => {
     const ca = await tournament('ca');
     expect(ca).toMatchObject({ phase: 'casual', status: 'open', format: null });
     const [match] = await listMatches('ca');
     expect(match).toMatchObject({ stage: 'casual', status: 'done', scoreA: 21 });
+  });
+});
+
+describe('Dexie v4 upgrade of a pre-bo3 database', () => {
+  const tournamentRow = {
+    ...oldTournament('v3', { phase: 'casual', status: 'open', format: null, startedAt: null }),
+    timedMode: null,
+    visibility: 'local',
+  };
+  delete (tournamentRow as Record<string, unknown>).matchFormat;
+  const current = (id: string, fields: Record<string, unknown>) =>
+    oldMatch(id, 'v3', { stage: 'casual', teamA: ['p1', 'p2'], teamB: ['p3', 'p4'], ...fields });
+
+  beforeEach(async () => {
+    await db.delete();
+    // The current schema one version back: v3 rows in today's shape, minus
+    // the bo1/bo3 fields.
+    const v3 = new Dexie('rally');
+    v3.version(1).stores({
+      tournaments: 'id, createdAt, updatedAt, status',
+      players: 'id, tournamentId, [tournamentId+active], [tournamentId+inTournament], name',
+      matches:
+        'id, tournamentId, sequence, [tournamentId+stage], [tournamentId+status], [tournamentId+round]',
+      meta: 'key',
+    });
+    v3.version(2).stores({ sync: 'tournamentId' });
+    v3.version(3).stores({});
+    await v3.open();
+    await v3.table('tournaments').add(tournamentRow);
+    await v3.table('players').bulkAdd(['p1', 'p2', 'p3', 'p4'].map((id) => oldPlayer(id, 'v3', false)));
+    await v3.table('matches').bulkAdd([
+      current('played', played(21, 17, 1)),
+      current('on-court', {}),
+    ]);
+    v3.close();
+    await db.open();
+  });
+
+  afterEach(() => db.close());
+
+  it('makes every match a bo1, a played one with its score as the one game', async () => {
+    expect(db.verno).toBe(4);
+    const matches = await listMatches('v3');
+    expect(matches.find((m) => m.id === 'played')).toMatchObject({
+      format: 'bo1',
+      games: [{ scoreA: 21, scoreB: 17 }],
+    });
+    expect(matches.find((m) => m.id === 'on-court')).toMatchObject({ format: 'bo1', games: [] });
+
+    // The result keeps counting exactly as before the upgrade.
+    const players = await listPlayers('v3');
+    const replay = replayElo(players, matches, DEFAULT_ELO_SETTINGS);
+    expect(Object.keys(replay.perMatch)).toEqual(['played']);
+    expect(replay.gamesPlayed.p1).toBe(1);
+  });
+
+  it('finishes an upgraded bo1 with a single further result', async () => {
+    const { decided } = await setMatchResult('on-court', 21, 12);
+    expect(decided).toBe(true);
+    expect((await listMatches('v3')).find((m) => m.id === 'on-court')).toMatchObject({
+      status: 'done',
+      scoreA: 21,
+      scoreB: 12,
+    });
   });
 });
 
@@ -342,6 +419,8 @@ describe('importBackup of a pre-refactor export', () => {
     const de = all.find((t) => t.name === 'de')!;
     const [kept] = await listMatches(de.id);
     expect(kept).toMatchObject({ stage: 'casual', feedsWinnerTo: null, feedsLoserTo: null });
+    // A backup from before bo1/bo3 support has neither field on its matches.
+    expect(kept).toMatchObject({ format: 'bo1', games: [{ scoreA: 21, scoreB: 9 }] });
 
     // The surviving bracket is remapped consistently: bracket teams and the
     // final point at the imported players.

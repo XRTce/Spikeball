@@ -24,6 +24,7 @@ import {
   type UnlockRequest,
 } from '../src/sync/protocol';
 import { protectedChanges, type ProtectionInput } from '../src/sync/protection';
+import { withBestOfFields } from '../src/domain/bestOf';
 import { Store } from './store';
 import { EventHub } from './events';
 import { RateLimiter } from './rateLimit';
@@ -418,7 +419,9 @@ function toProtectionInput(snapshot: TournamentSnapshot): ProtectionInput {
   return {
     tournament: snapshot.tournament,
     players: snapshot.players.map((player) => ({ id: player.id, baseElo: player.baseElo })),
-    matches: snapshot.matches,
+    // A snapshot stored before bo1/bo3 support (or pushed by a client that
+    // has not updated) has no `games`; the rule reads them.
+    matches: snapshot.matches.map(withBestOfFields),
   };
 }
 

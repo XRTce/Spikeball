@@ -10,6 +10,7 @@ import {
   listMatches,
   listPlayers,
   recordCasualResult,
+  scheduleCasualMatch,
   setMatchResult,
   startDraftedBracket,
   startFreePlayTimer,
@@ -17,6 +18,9 @@ import {
 } from '../src/db/repo';
 import { exportBackup, importBackup, parseBackup, BackupFormatError } from '../src/db/backup';
 import { bracketResult } from '../src/domain/pairing/elimination';
+import { replayElo } from '../src/domain/elo';
+import { buildStandings } from '../src/domain/standings';
+import { DEFAULT_ELO_SETTINGS } from '../src/domain/types';
 
 beforeEach(async () => {
   await db.delete();
@@ -235,6 +239,148 @@ describe('tournament mode', () => {
     const matches = await listMatches(tournamentId);
     expect(matches).toHaveLength(1);
     expect(matches[0]!.stage).toBe('casual');
+  });
+});
+
+describe('best-of format', () => {
+  it('defaults a casual match to bo1 and honours an explicit bo3', async () => {
+    const { tournamentId, playerIds } = await seedTournament(8);
+    const [a, b, c, d, e, f] = playerIds as [string, string, string, string, string, string];
+
+    const bo1Id = await scheduleCasualMatch(tournamentId, [a, b], [c, d]);
+    const bo3Id = await scheduleCasualMatch(tournamentId, [e, f], [a, b], 'bo3');
+    const matches = await listMatches(tournamentId);
+    expect(matches.find((m) => m.id === bo1Id)?.format).toBe('bo1');
+    expect(matches.find((m) => m.id === bo3Id)?.format).toBe('bo3');
+  });
+
+  it('creates every bracket match as bo3', async () => {
+    const { tournamentId, playerIds } = await seedTournament(8);
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds), thirdPlaceMatch: true });
+    const matches = await listMatches(tournamentId);
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.every((match) => match.format === 'bo3')).toBe(true);
+  });
+
+  it('keeps a bo3 open after one game and rates it already, then auto-finishes on the second win', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+
+    const afterGame1 = await setMatchResult(matchId, 21, 15);
+    expect(afterGame1.decided).toBe(false);
+    let match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.status).toBe('scheduled');
+    expect(match.games).toHaveLength(1);
+    // Elo already reflects the first game, before the series is decided.
+    expect((await db.players.get(a))!.elo).toBeGreaterThan(1000);
+
+    const afterGame2 = await setMatchResult(matchId, 21, 18);
+    expect(afterGame2.decided).toBe(true);
+    match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.status).toBe('done');
+    expect(match.games).toHaveLength(2);
+    // The top-level score is the games-won tally, not raw points.
+    expect(match.scoreA).toBe(2);
+    expect(match.scoreB).toBe(0);
+  });
+
+  it('never asks for a third game once a side has won twice', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+    await setMatchResult(matchId, 21, 10);
+    const { decided } = await setMatchResult(matchId, 21, 12);
+    expect(decided).toBe(true);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.games).toHaveLength(2);
+  });
+
+  it('corrects an earlier game of a running series by its index', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+    await setMatchResult(matchId, 15, 21);
+    const wrongWay = (await db.players.get(a))!.elo;
+
+    // Game 1 actually went the other way: fix it in place, series stays open.
+    const { decided } = await setMatchResult(matchId, 21, 15, 0);
+    expect(decided).toBe(false);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.games).toEqual([{ scoreA: 21, scoreB: 15 }]);
+    expect(match.status).toBe('scheduled');
+    expect((await db.players.get(a))!.elo).toBeGreaterThan(wrongWay);
+  });
+
+  it('reopens a decided series when a correction undoes the deciding win', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+    await setMatchResult(matchId, 21, 15);
+    await setMatchResult(matchId, 21, 18);
+
+    // The edit pencil corrects the last game by default.
+    const { decided } = await setMatchResult(matchId, 18, 21);
+    expect(decided).toBe(false);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match).toMatchObject({ status: 'scheduled', scoreA: null, scoreB: null, playedAt: null });
+    expect(match.games).toHaveLength(2);
+    // Still on court, so the standings do not count it yet.
+    const players = await listPlayers(tournamentId);
+    const standings = buildStandings(players, [match], replayElo(players, [match], DEFAULT_ELO_SETTINGS));
+    expect(standings.every((row) => row.played === 0)).toBe(true);
+  });
+
+  it('counts a bo3 as one played match while every game is its own Elo event', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d], 'bo3');
+    await setMatchResult(matchId, 21, 15);
+    await setMatchResult(matchId, 15, 21);
+    await setMatchResult(matchId, 21, 19);
+
+    const players = await listPlayers(tournamentId);
+    const matches = await listMatches(tournamentId);
+    const replay = replayElo(players, matches, DEFAULT_ELO_SETTINGS);
+    const row = buildStandings(players, matches, replay).find((r) => r.playerId === a)!;
+    expect(row).toMatchObject({ played: 1, wins: 1, pointsFor: 57, pointsAgainst: 55 });
+    expect(replay.gamesPlayed[a]).toBe(3);
+  });
+
+  it('drops a series from the old pairing, and its rating effect, when a correction re-routes the bracket', async () => {
+    const { tournamentId, playerIds } = await seedTournament(8);
+    await startDraftedBracket({ tournamentId, teams: pairsOf(playerIds), thirdPlaceMatch: false });
+    const semis = (await listMatches(tournamentId))
+      .filter((m) => m.round === 1 && !m.bye)
+      .sort((x, y) => x.order - y.order);
+    for (const semi of semis) {
+      await setMatchResult(semi.id, 21, 15);
+      await setMatchResult(semi.id, 21, 15);
+    }
+    const finalId = (await listMatches(tournamentId)).find((m) => m.round === 2)!.id;
+    await setMatchResult(finalId, 21, 0);
+
+    // The first semi is corrected so its other team goes through instead.
+    await setMatchResult(semis[0]!.id, 15, 21);
+    await setMatchResult(semis[0]!.id, 15, 21);
+
+    const final = (await listMatches(tournamentId)).find((m) => m.id === finalId)!;
+    expect(final.teamA).toEqual(semis[0]!.teamB);
+    expect(final.games).toEqual([]);
+    const players = await listPlayers(tournamentId);
+    const replay = replayElo(players, await listMatches(tournamentId), DEFAULT_ELO_SETTINGS);
+    expect(replay.perMatch[finalId]).toBeUndefined();
+  });
+
+  it('keeps a bo1 top-level score as the raw points, not a games-won tally', async () => {
+    const { tournamentId, playerIds } = await seedTournament(4);
+    const [a, b, c, d] = playerIds as [string, string, string, string];
+    const matchId = await scheduleCasualMatch(tournamentId, [a, b], [c, d]);
+    const { decided } = await setMatchResult(matchId, 21, 18);
+    expect(decided).toBe(true);
+    const match = (await listMatches(tournamentId)).find((m) => m.id === matchId)!;
+    expect(match.scoreA).toBe(21);
+    expect(match.scoreB).toBe(18);
   });
 });
 

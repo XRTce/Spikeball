@@ -10,7 +10,7 @@ import {
   teamRating,
 } from '../src/domain/elo';
 import { DEFAULT_ELO_SETTINGS, type EloSettings } from '../src/domain/types';
-import { makePlayer, makePlayers, playedMatch, resetIds, resetSequence } from './helpers';
+import { makeMatch, makePlayer, makePlayers, playedMatch, resetIds, resetSequence } from './helpers';
 
 const flatSettings: EloSettings = {
   ...DEFAULT_ELO_SETTINGS,
@@ -72,7 +72,7 @@ describe('marginMultiplier', () => {
 
 describe('computeMatchDeltas', () => {
   const ratings = { a: 1000, b: 1000, c: 1000, d: 1000 };
-  const matchesPlayed = { a: 20, b: 20, c: 20, d: 20 };
+  const gamesPlayed = { a: 20, b: 20, c: 20, d: 20 };
 
   it('splits half the K-factor on an even 2v2', () => {
     const deltas = computeMatchDeltas({
@@ -81,7 +81,7 @@ describe('computeMatchDeltas', () => {
       scoreA: 21,
       scoreB: 15,
       ratings,
-      matchesPlayed,
+      gamesPlayed,
       settings: flatSettings,
     });
     expect(deltas.a).toBe(12);
@@ -97,7 +97,7 @@ describe('computeMatchDeltas', () => {
       scoreA: 21,
       scoreB: 9,
       ratings: { a: 1200, b: 1150, c: 900, d: 980 },
-      matchesPlayed,
+      gamesPlayed,
       settings: flatSettings,
     });
     const sum = Object.values(deltas).reduce((total, value) => total + value, 0);
@@ -111,7 +111,7 @@ describe('computeMatchDeltas', () => {
       scoreA: 21,
       scoreB: 19,
       ratings: { a: 900, b: 900, c: 1300, d: 1300 },
-      matchesPlayed,
+      gamesPlayed,
       settings: flatSettings,
     });
     const expected = computeMatchDeltas({
@@ -120,7 +120,7 @@ describe('computeMatchDeltas', () => {
       scoreA: 21,
       scoreB: 19,
       ratings: { a: 1300, b: 1300, c: 900, d: 900 },
-      matchesPlayed,
+      gamesPlayed,
       settings: flatSettings,
     });
     expect(upset.a!).toBeGreaterThan(expected.a!);
@@ -133,7 +133,7 @@ describe('computeMatchDeltas', () => {
       scoreA: 21,
       scoreB: 12,
       ratings,
-      matchesPlayed: { a: 0, b: 30, c: 30, d: 30 },
+      gamesPlayed: { a: 0, b: 30, c: 30, d: 30 },
       settings: { ...DEFAULT_ELO_SETTINGS, useMarginOfVictory: false },
     });
     expect(deltas.a).toBe(20);
@@ -147,7 +147,7 @@ describe('computeMatchDeltas', () => {
       scoreA: 21,
       scoreB: 10,
       ratings,
-      matchesPlayed,
+      gamesPlayed,
       settings: flatSettings,
     });
     expect(deltas.a).toBe(12);
@@ -166,7 +166,7 @@ describe('replayElo', () => {
     ];
     const replay = replayElo(players, matches, flatSettings);
 
-    expect(replay.matchesPlayed.p1).toBe(2);
+    expect(replay.gamesPlayed.p1).toBe(2);
     expect(replay.ratings.p1).toBeGreaterThan(1000);
     expect(replay.ratings.p4).toBeLessThan(1000);
     // Base seed point plus one point per player per match.
@@ -184,7 +184,7 @@ describe('replayElo', () => {
       playedMatch(['p1', 'p2'], ['p3', 'ghost'], 21, 4),
     ];
     const replay = replayElo(players, matches, flatSettings);
-    expect(replay.matchesPlayed.p1).toBe(1);
+    expect(replay.gamesPlayed.p1).toBe(1);
   });
 
   it('is independent of the order the match log is stored in', () => {
@@ -214,6 +214,52 @@ describe('replayElo', () => {
 
     const removed = replayElo(players, [first], DEFAULT_ELO_SETTINGS).ratings;
     expect(removed).toEqual(before);
+  });
+
+  it('rates a bo3 game by game, giving it more total weight than a bo1', () => {
+    resetIds();
+    resetSequence();
+    const bo1Players = makePlayers(4);
+    const bo1 = playedMatch(['p1', 'p2'], ['p3', 'p4'], 21, 15, { format: 'bo1' });
+    const bo1Replay = replayElo(bo1Players, [bo1], flatSettings);
+
+    resetIds();
+    resetSequence();
+    const bo3Players = makePlayers(4);
+    const bo3 = playedMatch(['p1', 'p2'], ['p3', 'p4'], 2, 0, {
+      format: 'bo3',
+      games: [
+        { scoreA: 21, scoreB: 15 },
+        { scoreA: 21, scoreB: 17 },
+      ],
+    });
+    const bo3Replay = replayElo(bo3Players, [bo3], flatSettings);
+
+    // Every game is its own rated event.
+    expect(bo3Replay.gamesPlayed.p1).toBe(2);
+    expect(bo1Replay.gamesPlayed.p1).toBe(1);
+    // perMatch still reports one aggregate entry per match, summed over its games.
+    expect(Object.keys(bo3Replay.perMatch)).toHaveLength(1);
+    expect(bo3Replay.perMatch[bo3.id]!.delta.p1).toBe(bo3Replay.ratings.p1! - 1000);
+    // A straight 2-0 bo3 sweep moves ratings by more than a single bo1 game
+    // of the same first-game margin, because the second win is its own event.
+    expect(bo3Replay.ratings.p1! - 1000).toBeGreaterThan(bo1Replay.ratings.p1! - 1000);
+  });
+
+  it('already moves ratings after the first game of an undecided bo3', () => {
+    resetIds();
+    resetSequence();
+    const players = makePlayers(4);
+    const inProgress = makeMatch({
+      teamA: ['p1', 'p2'],
+      teamB: ['p3', 'p4'],
+      format: 'bo3',
+      status: 'scheduled',
+      games: [{ scoreA: 21, scoreB: 15 }],
+    });
+    const replay = replayElo(players, [inProgress], flatSettings);
+    expect(replay.gamesPlayed.p1).toBe(1);
+    expect(replay.ratings.p1).toBeGreaterThan(1000);
   });
 
   it('starts every player from their own base rating', () => {

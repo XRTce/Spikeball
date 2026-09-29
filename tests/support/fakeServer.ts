@@ -17,6 +17,7 @@ import {
   type UnlockRequest,
 } from '../../src/sync/protocol';
 import { protectedChanges, type ProtectionInput } from '../../src/sync/protection';
+import { withBestOfFields } from '../../src/domain/bestOf';
 
 export const FAKE_API_BASE = 'http://fake.rally.local/api';
 
@@ -36,7 +37,7 @@ function toProtectionInput(snapshot: TournamentSnapshot): ProtectionInput {
   return {
     tournament: snapshot.tournament,
     players: snapshot.players.map((player) => ({ id: player.id, baseElo: player.baseElo })),
-    matches: snapshot.matches,
+    matches: snapshot.matches.map(withBestOfFields),
   };
 }
 

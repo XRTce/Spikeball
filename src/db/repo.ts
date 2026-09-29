@@ -5,12 +5,14 @@ import {
   type BracketTeam,
   type EloSettings,
   type Match,
+  type MatchFormat,
   type MatchStage,
   type PlaySettings,
   type Player,
   type Tournament,
 } from '../domain/types';
 import { replayElo } from '../domain/elo';
+import { defaultGameIndex, recordGame } from '../domain/bestOf';
 import {
   bracketResult,
   buildSingleElimination,
@@ -289,6 +291,8 @@ function blankMatch(tournamentId: string, stage: MatchStage, overrides: Partial<
     scoreA: null,
     scoreB: null,
     status: 'scheduled',
+    format: 'bo1',
+    games: [],
     bye: false,
     createdAt: Date.now(),
     playedAt: null,
@@ -311,8 +315,9 @@ async function scheduleCasualMatchImpl(
   tournamentId: string,
   teamA: string[],
   teamB: string[],
+  format: MatchFormat = 'bo1',
 ): Promise<string> {
-  const match = blankMatch(tournamentId, 'casual', { teamA, teamB });
+  const match = blankMatch(tournamentId, 'casual', { teamA, teamB, format });
   await db.matches.add(match);
   await touch(tournamentId);
   return match.id;
@@ -323,7 +328,7 @@ export const scheduleCasualMatch = command(
   scheduleCasualMatchImpl,
 );
 
-/** Records a finished ad-hoc match in one step. */
+/** Records a finished ad-hoc match in one step (always a single game). */
 async function recordCasualResultImpl(
   tournamentId: string,
   teamA: string[],
@@ -339,6 +344,8 @@ async function recordCasualResultImpl(
       scoreA,
       scoreB,
       status: 'done',
+      format: 'bo1',
+      games: [{ scoreA, scoreB }],
       playedAt: Date.now(),
       sequence: nextSequence(existing),
     });
@@ -354,9 +361,25 @@ export const recordCasualResult = command(
   recordCasualResultImpl,
 );
 
-async function setMatchResultImpl(matchId: string, scoreA: number, scoreB: number): Promise<void> {
+/**
+ * Records one game of a match - the rules are `recordGame` in
+ * domain/bestOf.ts. Without `gameIndex` the score goes where the result
+ * sheet puts it by default: the next game of an open series, or the last
+ * game of a decided one (the edit pencil). A bo1 is decided by its one
+ * game; a bo3 only becomes `done`, with the games-won tally as
+ * scoreA/scoreB, once a side has won 2 games. Each recorded game is its own
+ * Elo event via `recalculate`, whether or not the series is decided yet.
+ */
+async function setMatchResultImpl(
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+  gameIndex?: number,
+): Promise<{ decided: boolean }> {
   const match = await db.matches.get(matchId);
-  if (!match) return;
+  if (!match) return { decided: false };
+
+  const outcome = recordGame(match, gameIndex ?? defaultGameIndex(match), scoreA, scoreB);
 
   await db.transaction('rw', db.matches, async () => {
     const siblings = await db.matches.where('tournamentId').equals(match.tournamentId).toArray();
@@ -364,15 +387,17 @@ async function setMatchResultImpl(matchId: string, scoreA: number, scoreB: numbe
     // reshuffles the rating history of everything played afterwards.
     const sequence = match.sequence > 0 ? match.sequence : nextSequence(siblings);
     await db.matches.update(matchId, {
-      scoreA,
-      scoreB,
-      status: 'done',
-      playedAt: match.playedAt ?? Date.now(),
+      games: outcome.games,
+      scoreA: outcome.scoreA,
+      scoreB: outcome.scoreB,
+      status: outcome.decided ? 'done' : 'scheduled',
+      playedAt: outcome.decided ? (match.playedAt ?? Date.now()) : null,
       sequence,
     });
   });
 
   await recalculate(match.tournamentId);
+  return { decided: outcome.decided };
 }
 export const setMatchResult = command('setMatchResult', matchTournamentId, setMatchResultImpl);
 
@@ -382,6 +407,7 @@ async function clearMatchResultImpl(matchId: string): Promise<void> {
   await db.matches.update(matchId, {
     scoreA: null,
     scoreB: null,
+    games: [],
     status: 'scheduled',
     playedAt: null,
     sequence: 0,
@@ -425,6 +451,8 @@ function matchesFromDrafts(tournamentId: string, drafts: BracketMatchDraft[]): M
       teamA: draft.teamA,
       teamB: draft.teamB,
       status: draft.status,
+      // Bracket matches (winners + third place) are always played as bo3.
+      format: 'bo3',
       bye: draft.bye,
       feedsWinnerTo: draft.feedsWinnerTo,
       feedsLoserTo: draft.feedsLoserTo,
@@ -585,6 +613,13 @@ async function touch(tournamentId: string): Promise<void> {
   await db.tournaments.update(tournamentId, { updatedAt: Date.now() });
 }
 
+function sameGames(a: Match['games'], b: Match['games']): boolean {
+  return (
+    a.length === b.length &&
+    a.every((game, i) => game.scoreA === b[i]!.scoreA && game.scoreB === b[i]!.scoreB)
+  );
+}
+
 function matchesDiffer(a: Match, b: Match): boolean {
   return (
     a.teamA.join(',') !== b.teamA.join(',') ||
@@ -594,6 +629,8 @@ function matchesDiffer(a: Match, b: Match): boolean {
     a.status !== b.status ||
     a.bye !== b.bye ||
     a.playedAt !== b.playedAt ||
+    a.format !== b.format ||
+    !sameGames(a.games, b.games) ||
     a.feedsWinnerTo?.matchId !== b.feedsWinnerTo?.matchId ||
     a.feedsLoserTo?.matchId !== b.feedsLoserTo?.matchId
   );
