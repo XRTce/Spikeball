@@ -13,7 +13,9 @@
 .option {
   position: relative;
   z-index: 1;
-  min-height: 2.4rem;
+  /* The option itself is what gets tapped, so it carries the full target;
+     the track's padding only adds to it. */
+  min-height: var(--tap-target);
   padding: 0 var(--space-2);
   display: inline-flex;
   align-items: center;
