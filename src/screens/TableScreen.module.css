@@ -54,3 +54,32 @@
 .formLoss { background: var(--loss-500); }
 
 .scope { margin-bottom: var(--space-1); }
+
+.formatView { margin-bottom: var(--space-1); }
+
+/* The player column reads left to right; the shared table header is right-aligned. */
+table thead th.headLeft { text-align: left; }
+
+/* Sortable column headers: plain buttons that inherit the th look. */
+.sortButton {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: var(--space-2);
+  margin: calc(var(--space-2) * -1);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sortButton:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.sortActive {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

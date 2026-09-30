@@ -8,6 +8,7 @@ import {
   Screen,
   SectionTitle,
   Segmented,
+  SelectField,
   Stack,
   TableWrap,
   nameCellClass,
@@ -23,7 +24,14 @@ import { cx } from '../lib/cx';
 import { usePlayerColors } from '../state/playerColors';
 import { strings } from '../i18n';
 import { useTournamentView } from './TournamentLayout';
-import { buildStandings, compareByElo } from '../domain/standings';
+import {
+  buildStandings,
+  compareByElo,
+  compareByKey,
+  statsFor,
+  type StandingsFormatView,
+  type StandingsSortKey,
+} from '../domain/standings';
 import { eloSeries } from '../domain/elo';
 import type { MatchStage } from '../domain/types';
 import css from './TableScreen.module.css';
@@ -38,12 +46,29 @@ const SCOPE_STAGES: Record<Scope, MatchStage[] | undefined> = {
   casual: ['casual'],
 };
 
+// Column order matches the table; `label` is the header, `name` the spoken form.
+const SORT_COLUMNS: { key: StandingsSortKey; label: string; name: string }[] = [
+  { key: 'name', label: s.table.name, name: s.table.name },
+  { key: 'played', label: s.table.played, name: s.table.sortPlayed },
+  { key: 'wins', label: s.table.wins, name: s.table.sortWins },
+  { key: 'winRate', label: s.table.winRateShort, name: s.table.winRate },
+  { key: 'elo', label: s.table.elo, name: s.table.elo },
+];
+
+const FORMAT_OPTIONS: [StandingsFormatView, string][] = [
+  ['all', s.table.formatAll],
+  ['bo1', s.table.formatBo1],
+  ['bo3', s.table.formatBo3],
+];
+
 export function TableScreen() {
   const view = useTournamentView();
   const navigate = useNavigate();
   const colors = usePlayerColors();
   const tournament = view.tournament!;
   const [scope, setScope] = useState<Scope>('all');
+  const [sortKey, setSortKey] = useState<StandingsSortKey>('elo');
+  const [formatView, setFormatView] = useState<StandingsFormatView>('all');
 
   const standings = useMemo(() => {
     const stages = SCOPE_STAGES[scope];
@@ -54,6 +79,16 @@ export function TableScreen() {
       stages ? { stages } : {},
     ).sort(compareByElo);
   }, [scope, view.matches, view.players, view.replay]);
+
+  // Rank and medals always follow the rating order; only the row order changes.
+  const rankOf = useMemo(
+    () => new Map(standings.map((row, index) => [row.playerId, index])),
+    [standings],
+  );
+  const rows = useMemo(
+    () => [...standings].sort(compareByKey(sortKey, formatView)),
+    [standings, sortKey, formatView],
+  );
 
   const played = standings.reduce((sum, row) => sum + row.played, 0);
 
@@ -112,21 +147,56 @@ export function TableScreen() {
             <EmptyState icon="chart" title={s.table.empty} text={s.table.emptyText} />
           ) : (
             <>
+              <div className={css.formatView}>
+                <SelectField
+                  label={s.table.formatView}
+                  value={formatView}
+                  onChange={(event) =>
+                    setFormatView(event.target.value as StandingsFormatView)
+                  }
+                >
+                  {FORMAT_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
               <div className={css.card}>
                 <TableWrap>
                   <table className={cx(tableClass, compactTableClass)}>
                     <thead>
                       <tr>
                         <th>{s.table.rank}</th>
-                        <th>{s.table.name}</th>
-                        <th>{s.table.played}</th>
-                        <th>{s.table.wins}</th>
-                        <th>{s.table.diff}</th>
-                        <th>{s.table.elo}</th>
+                        {SORT_COLUMNS.map(({ key, label, name }) => (
+                          <th
+                            key={key}
+                            className={key === 'name' ? css.headLeft : undefined}
+                            aria-sort={
+                              sortKey === key
+                                ? key === 'name'
+                                  ? 'ascending'
+                                  : 'descending'
+                                : undefined
+                            }
+                          >
+                            <button
+                              type="button"
+                              className={cx(css.sortButton, sortKey === key && css.sortActive)}
+                              aria-label={s.table.sortByColumn(name)}
+                              onClick={() => setSortKey(key)}
+                            >
+                              {label}
+                            </button>
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {standings.map((row, index) => (
+                      {rows.map((row) => {
+                        const index = rankOf.get(row.playerId) ?? 0;
+                        const stats = statsFor(row, formatView);
+                        return (
                         <tr
                           key={row.playerId}
                           className={css.row}
@@ -172,14 +242,15 @@ export function TableScreen() {
                               </span>
                             </span>
                           </td>
-                          <td>{row.played}</td>
-                          <td>{row.wins}</td>
-                          <td>{row.pointDiff > 0 ? `+${row.pointDiff}` : row.pointDiff}</td>
+                          <td>{stats.played}</td>
+                          <td>{stats.wins}</td>
+                          <td>{Math.round(stats.winRate * 100)}%</td>
                           <td>
                             {row.elo} <EloDelta value={row.eloChange} showZero={false} />
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </TableWrap>

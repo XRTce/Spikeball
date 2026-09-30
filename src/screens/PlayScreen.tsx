@@ -257,6 +257,9 @@ function CasualPlay({
     [available, maxPartnerRepeats, seed, tournament.elo.baseElo, view.history, view.ratings, view.teamSize],
   );
 
+  const teamElo = (ids: string[]) =>
+    ids.reduce((sum, id) => sum + (view.ratings[id] ?? tournament.elo.baseElo), 0);
+
   const probability = suggestion
     ? matchWinProbability(
         suggestion.teamA,
@@ -332,6 +335,7 @@ function CasualPlay({
                   <span className={css.teamNames}>
                     {teamLabel(suggestion.teamA, view.playerById)}
                   </span>
+                  <span className={css.teamElo}>({teamElo(suggestion.teamA)})</span>
                 </div>
                 <span className={css.vs}>{s.play.versus}</span>
                 <div className={css.team}>
@@ -345,6 +349,7 @@ function CasualPlay({
                   <span className={css.teamNames}>
                     {teamLabel(suggestion.teamB, view.playerById)}
                   </span>
+                  <span className={css.teamElo}>({teamElo(suggestion.teamB)})</span>
                 </div>
               </div>
 

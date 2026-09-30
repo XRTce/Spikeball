@@ -158,6 +158,8 @@ export interface StandingRow {
   pointsAgainst: number;
   pointDiff: number;
   winRate: number;
+  /** Matches and wins per format (a bo3 series counts once). */
+  byFormat: Record<MatchFormat, { played: number; wins: number }>;
   elo: number;
   baseElo: number;
   eloChange: number;

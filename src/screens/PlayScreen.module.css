@@ -49,6 +49,13 @@
   overflow-wrap: anywhere;
 }
 
+.teamElo {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 .vs {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
