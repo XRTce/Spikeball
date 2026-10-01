@@ -147,9 +147,11 @@
 
 /*
  * Phone-width standings. The rating is the reason the table exists, so rather
- * than letting the row scroll sideways the two most redundant cells - matches
- * played and the recent-form dots - are dropped on narrow screens. Both are
- * still shown in full on the player detail screen.
+ * than letting the row scroll sideways the most redundant cell - matches
+ * played, the third column - is dropped on narrow screens (with every column
+ * the table is ~22px too wide at 375px). It is still shown on the player
+ * detail screen, and the win rate column shows "–" instead of 0% for a
+ * player without matches, so the table stays unambiguous without it.
  */
 .compact th:nth-child(3),
 .compact td:nth-child(3) {

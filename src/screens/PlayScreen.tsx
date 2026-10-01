@@ -25,7 +25,7 @@ import { useTournamentView } from './TournamentLayout';
 import { groupRounds, matchCompletesTournament, scheduleProgress } from '../domain/schedule';
 import { eliminationSize } from '../domain/pairing/elimination';
 import { suggestCasualMatch } from '../domain/pairing/casual';
-import { matchWinProbability } from '../domain/elo';
+import { matchWinProbability, teamRating } from '../domain/elo';
 import { gamesWon, recordGame } from '../domain/bestOf';
 import {
   clearMatchResult,
@@ -257,8 +257,10 @@ function CasualPlay({
     [available, maxPartnerRepeats, seed, tournament.elo.baseElo, view.history, view.ratings, view.teamSize],
   );
 
+  // A team plays at its players' average rating - the same `teamRating` the
+  // win chance next to it is computed from.
   const teamElo = (ids: string[]) =>
-    ids.reduce((sum, id) => sum + (view.ratings[id] ?? tournament.elo.baseElo), 0);
+    Math.round(teamRating(ids.map((id) => view.ratings[id] ?? tournament.elo.baseElo)));
 
   const probability = suggestion
     ? matchWinProbability(

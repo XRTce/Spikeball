@@ -119,7 +119,7 @@ export function compareByElo(a: StandingRow, b: StandingRow): number {
   );
 }
 
-export type StandingsSortKey = 'elo' | 'played' | 'wins' | 'winRate' | 'pointDiff' | 'name';
+export type StandingsSortKey = 'elo' | 'played' | 'wins' | 'winRate' | 'name';
 
 export type StandingsFormatView = 'all' | MatchFormat;
 
@@ -136,7 +136,9 @@ export function statsFor(
 /**
  * Comparator for the table's "sort by" choice. Numeric keys sort high to low
  * with the rating order as tiebreak; names sort A to Z. Matches, wins and win
- * rate follow the chosen format view.
+ * rate follow the chosen format view, and - as in `compareByElo` - a player
+ * without a match in that view sits below everyone who has one, so a 0% from
+ * never playing never ranks alongside (or above) a 0% from losing.
  */
 export function compareByKey(
   key: StandingsSortKey,
@@ -144,8 +146,15 @@ export function compareByKey(
 ): (a: StandingRow, b: StandingRow) => number {
   if (key === 'elo') return compareByElo;
   if (key === 'name') return (a, b) => a.name.localeCompare(b.name, 'de');
-  if (key === 'pointDiff') return (a, b) => b.pointDiff - a.pointDiff || compareByElo(a, b);
-  return (a, b) => statsFor(b, view)[key] - statsFor(a, view)[key] || compareByElo(a, b);
+  return (a, b) => {
+    const statsA = statsFor(a, view);
+    const statsB = statsFor(b, view);
+    return (
+      Number(statsB.played > 0) - Number(statsA.played > 0) ||
+      statsB[key] - statsA[key] ||
+      compareByElo(a, b)
+    );
+  };
 }
 
 /** Head-to-head record between two players across the given matches. */

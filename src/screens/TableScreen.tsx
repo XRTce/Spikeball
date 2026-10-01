@@ -8,7 +8,6 @@ import {
   Screen,
   SectionTitle,
   Segmented,
-  SelectField,
   Stack,
   TableWrap,
   nameCellClass,
@@ -55,10 +54,11 @@ const SORT_COLUMNS: { key: StandingsSortKey; label: string; name: string }[] = [
   { key: 'elo', label: s.table.elo, name: s.table.elo },
 ];
 
-const FORMAT_OPTIONS: [StandingsFormatView, string][] = [
-  ['all', s.table.formatAll],
-  ['bo1', s.table.formatBo1],
-  ['bo3', s.table.formatBo3],
+// Filters matches, wins and win rate; rank, rating and the charts stay overall.
+const FORMAT_OPTIONS: { value: StandingsFormatView; label: string }[] = [
+  { value: 'all', label: s.table.formatAll },
+  { value: 'bo1', label: s.table.formatBo1 },
+  { value: 'bo3', label: s.table.formatBo3 },
 ];
 
 export function TableScreen() {
@@ -148,19 +148,12 @@ export function TableScreen() {
           ) : (
             <>
               <div className={css.formatView}>
-                <SelectField
-                  label={s.table.formatView}
+                <Segmented
+                  ariaLabel={s.table.formatView}
                   value={formatView}
-                  onChange={(event) =>
-                    setFormatView(event.target.value as StandingsFormatView)
-                  }
-                >
-                  {FORMAT_OPTIONS.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </SelectField>
+                  onChange={setFormatView}
+                  options={FORMAT_OPTIONS}
+                />
               </div>
               <div className={css.card}>
                 <TableWrap>
@@ -197,58 +190,62 @@ export function TableScreen() {
                         const index = rankOf.get(row.playerId) ?? 0;
                         const stats = statsFor(row, formatView);
                         return (
-                        <tr
-                          key={row.playerId}
-                          className={css.row}
-                          onClick={() =>
-                            navigate(`/t/${tournament.id}/player/${row.playerId}`)
-                          }
-                        >
-                          <td className={rankCellClass}>
-                            {index < 3 && row.played > 0 ? (
-                              <span
-                                className={cx(
-                                  css.medal,
-                                  index === 0 && css.gold,
-                                  index === 1 && css.silver,
-                                  index === 2 && css.bronze,
-                                )}
-                              >
-                                {index + 1}
+                          <tr
+                            key={row.playerId}
+                            className={css.row}
+                            onClick={() =>
+                              navigate(`/t/${tournament.id}/player/${row.playerId}`)
+                            }
+                          >
+                            <td className={rankCellClass}>
+                              {index < 3 && row.played > 0 ? (
+                                <span
+                                  className={cx(
+                                    css.medal,
+                                    index === 0 && css.gold,
+                                    index === 1 && css.silver,
+                                    index === 2 && css.bronze,
+                                  )}
+                                >
+                                  {index + 1}
+                                </span>
+                              ) : (
+                                index + 1
+                              )}
+                            </td>
+                            <td>
+                              <span className={nameCellClass}>
+                                <Avatar
+                                  name={row.name}
+                                  seed={row.playerId}
+                                  size={26}
+                                  color={colors.varOf(row.playerId)}
+                                />
+                                <span className={nameTextClass}>{row.name}</span>
+                                <span className={css.form}>
+                                  {row.form.map((won, i) => (
+                                    <span
+                                      key={i}
+                                      className={cx(
+                                        css.formDot,
+                                        won ? css.formWin : css.formLoss,
+                                      )}
+                                    />
+                                  ))}
+                                </span>
                               </span>
-                            ) : (
-                              index + 1
-                            )}
-                          </td>
-                          <td>
-                            <span className={nameCellClass}>
-                              <Avatar
-                                name={row.name}
-                                seed={row.playerId}
-                                size={26}
-                                color={colors.varOf(row.playerId)}
-                              />
-                              <span className={nameTextClass}>{row.name}</span>
-                              <span className={css.form}>
-                                {row.form.map((won, i) => (
-                                  <span
-                                    key={i}
-                                    className={cx(
-                                      css.formDot,
-                                      won ? css.formWin : css.formLoss,
-                                    )}
-                                  />
-                                ))}
-                              </span>
-                            </span>
-                          </td>
-                          <td>{stats.played}</td>
-                          <td>{stats.wins}</td>
-                          <td>{Math.round(stats.winRate * 100)}%</td>
-                          <td>
-                            {row.elo} <EloDelta value={row.eloChange} showZero={false} />
-                          </td>
-                        </tr>
+                            </td>
+                            <td>{stats.played}</td>
+                            <td>{stats.wins}</td>
+                            <td>
+                              {stats.played === 0
+                                ? s.table.noGames
+                                : `${Math.round(stats.winRate * 100)}%`}
+                            </td>
+                            <td>
+                              {row.elo} <EloDelta value={row.eloChange} showZero={false} />
+                            </td>
+                          </tr>
                         );
                       })}
                     </tbody>

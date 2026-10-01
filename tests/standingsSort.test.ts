@@ -42,7 +42,6 @@ describe('compareByKey', () => {
 
   it('sorts numeric keys high to low', () => {
     expect(order('wins', rows)).toEqual(['Ben', 'Ana', 'Cara', 'Dora']);
-    expect(order('pointDiff', rows)).toEqual(['Ben', 'Ana', 'Dora', 'Cara']);
     expect(order('played', rows)).toEqual(['Ana', 'Cara', 'Ben', 'Dora']);
     expect(order('winRate', rows)).toEqual(['Ben', 'Ana', 'Cara', 'Dora']);
   });
@@ -64,10 +63,22 @@ describe('compareByKey', () => {
     ];
     const sorted = (view: 'bo1' | 'bo3', key: 'played' | 'wins' | 'winRate') =>
       [...byFormat].sort(compareByKey(key, view)).map((r) => r.name);
-    expect(sorted('bo1', 'wins')).toEqual(['Ana', 'Ben', 'Cara']);
+    // Ben never played a bo1, so he sits below Cara's lost one despite his rating.
+    expect(sorted('bo1', 'wins')).toEqual(['Ana', 'Cara', 'Ben']);
     expect(sorted('bo3', 'wins')).toEqual(['Ben', 'Cara', 'Ana']);
     expect(sorted('bo3', 'played')).toEqual(['Cara', 'Ben', 'Ana']);
     expect(sorted('bo3', 'winRate')).toEqual(['Ben', 'Cara', 'Ana']);
+  });
+
+  it('puts players without a match in the format view last, whatever their rating', () => {
+    const view = [
+      row('Loser', { elo: 900, byFormat: { bo1: { played: 0, wins: 0 }, bo3: { played: 2, wins: 0 } } }),
+      row('Unplayed', { elo: 1300, byFormat: { bo1: { played: 4, wins: 4 }, bo3: { played: 0, wins: 0 } } }),
+      row('Winner', { elo: 1000, byFormat: { bo1: { played: 0, wins: 0 }, bo3: { played: 1, wins: 1 } } }),
+    ];
+    for (const key of ['played', 'wins', 'winRate'] as const) {
+      expect([...view].sort(compareByKey(key, 'bo3')).map((r) => r.name).at(-1)).toBe('Unplayed');
+    }
   });
 });
 
