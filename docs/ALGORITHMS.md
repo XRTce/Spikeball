@@ -170,3 +170,11 @@ Ranked by wins, then point difference, then points scored, then rating, then
 name — the usual club order, with a deterministic final tiebreak so the table
 never jitters between renders. Wins and matches played count decided matches (a
 bo3 is one); points are the real points of every game.
+
+The table screen orders rows by rating (`compareByElo`) and lets the organiser
+re-sort by name, matches, wins or win rate (`compareByKey`) without changing
+the rank: the number and medal stay the rating place. Matches, wins and win
+rate can be narrowed to bo1 or bo3 (`StandingRow.byFormat`, `statsFor`). In
+every ordering a player without a match in the current view sits below those
+who have one, and shows no win rate rather than 0%, so never having played is
+never confused with having lost.

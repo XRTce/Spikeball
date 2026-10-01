@@ -1,6 +1,6 @@
 import { isRatedMatch, compareMatchOrder, type EloReplay } from './elo';
 import { bracketResult } from './pairing/elimination';
-import type { Match, Player, StandingRow, TournamentFormat } from './types';
+import type { Match, MatchFormat, Player, StandingRow, TournamentFormat } from './types';
 
 export interface StandingsOptions {
   /** Restrict the table to these player ids (e.g. tournament participants). */
@@ -38,6 +38,7 @@ export function buildStandings(
       pointsAgainst: 0,
       pointDiff: 0,
       winRate: 0,
+      byFormat: { bo1: { played: 0, wins: 0 }, bo3: { played: 0, wins: 0 } },
       elo,
       baseElo: player.baseElo,
       eloChange: elo - player.baseElo,
@@ -71,8 +72,14 @@ export function buildStandings(
         row.played += 1;
         row.pointsFor += own;
         row.pointsAgainst += other;
-        if (won) row.wins += 1;
-        else row.losses += 1;
+        const formatStats = row.byFormat[match.format];
+        formatStats.played += 1;
+        if (won) {
+          row.wins += 1;
+          formatStats.wins += 1;
+        } else {
+          row.losses += 1;
+        }
         row.form.unshift(won);
         if (row.form.length > 5) row.form.pop();
       }
@@ -110,6 +117,44 @@ export function compareByElo(a: StandingRow, b: StandingRow): number {
     b.pointDiff - a.pointDiff ||
     a.name.localeCompare(b.name, 'de')
   );
+}
+
+export type StandingsSortKey = 'elo' | 'played' | 'wins' | 'winRate' | 'name';
+
+export type StandingsFormatView = 'all' | MatchFormat;
+
+/** Matches, wins and win rate of a row, overall or for a single match format. */
+export function statsFor(
+  row: StandingRow,
+  view: StandingsFormatView,
+): { played: number; wins: number; winRate: number } {
+  if (view === 'all') return { played: row.played, wins: row.wins, winRate: row.winRate };
+  const { played, wins } = row.byFormat[view];
+  return { played, wins, winRate: played === 0 ? 0 : wins / played };
+}
+
+/**
+ * Comparator for the table's "sort by" choice. Numeric keys sort high to low
+ * with the rating order as tiebreak; names sort A to Z. Matches, wins and win
+ * rate follow the chosen format view, and - as in `compareByElo` - a player
+ * without a match in that view sits below everyone who has one, so a 0% from
+ * never playing never ranks alongside (or above) a 0% from losing.
+ */
+export function compareByKey(
+  key: StandingsSortKey,
+  view: StandingsFormatView = 'all',
+): (a: StandingRow, b: StandingRow) => number {
+  if (key === 'elo') return compareByElo;
+  if (key === 'name') return (a, b) => a.name.localeCompare(b.name, 'de');
+  return (a, b) => {
+    const statsA = statsFor(a, view);
+    const statsB = statsFor(b, view);
+    return (
+      Number(statsB.played > 0) - Number(statsA.played > 0) ||
+      statsB[key] - statsA[key] ||
+      compareByElo(a, b)
+    );
+  };
 }
 
 /** Head-to-head record between two players across the given matches. */

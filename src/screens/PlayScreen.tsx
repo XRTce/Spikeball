@@ -25,7 +25,7 @@ import { useTournamentView } from './TournamentLayout';
 import { groupRounds, matchCompletesTournament, scheduleProgress } from '../domain/schedule';
 import { eliminationSize } from '../domain/pairing/elimination';
 import { suggestCasualMatch } from '../domain/pairing/casual';
-import { matchWinProbability } from '../domain/elo';
+import { matchWinProbability, teamRating } from '../domain/elo';
 import { gamesWon, recordGame } from '../domain/bestOf';
 import {
   clearMatchResult,
@@ -257,6 +257,11 @@ function CasualPlay({
     [available, maxPartnerRepeats, seed, tournament.elo.baseElo, view.history, view.ratings, view.teamSize],
   );
 
+  // A team plays at its players' average rating - the same `teamRating` the
+  // win chance next to it is computed from.
+  const teamElo = (ids: string[]) =>
+    Math.round(teamRating(ids.map((id) => view.ratings[id] ?? tournament.elo.baseElo)));
+
   const probability = suggestion
     ? matchWinProbability(
         suggestion.teamA,
@@ -332,6 +337,7 @@ function CasualPlay({
                   <span className={css.teamNames}>
                     {teamLabel(suggestion.teamA, view.playerById)}
                   </span>
+                  <span className={css.teamElo}>({teamElo(suggestion.teamA)})</span>
                 </div>
                 <span className={css.vs}>{s.play.versus}</span>
                 <div className={css.team}>
@@ -345,6 +351,7 @@ function CasualPlay({
                   <span className={css.teamNames}>
                     {teamLabel(suggestion.teamB, view.playerById)}
                   </span>
+                  <span className={css.teamElo}>({teamElo(suggestion.teamB)})</span>
                 </div>
               </div>
 

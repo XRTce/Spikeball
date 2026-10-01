@@ -33,16 +33,34 @@
 .silver { background: var(--silver); }
 .bronze { background: var(--bronze); color: #fff; }
 
-.form {
-  display: none;
+/*
+ * Mobile first: every column fits at phone width, so nothing is hidden there.
+ * The recent-form dots sit under the name and the rating change under the
+ * rating, stacked instead of side by side, which keeps the row narrow.
+ */
+.nameStack {
+  display: flex;
+  flex-direction: column;
   gap: 3px;
-  vertical-align: middle;
+  min-width: 0;
+  /* The shared table right-aligns every body cell. */
+  text-align: left;
 }
 
-/* Same breakpoint as the compact table: form dots are the first thing to go. */
-@media (min-width: 26rem) {
-  .form { display: inline-flex; }
+.form {
+  display: inline-flex;
+  gap: 3px;
 }
+
+.eloStack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+/* A narrow column must not squeeze the trend arrow away. */
+.eloStack svg { flex: none; }
 
 .formDot {
   width: 6px;
@@ -54,3 +72,43 @@
 .formLoss { background: var(--loss-500); }
 
 .scope { margin-bottom: var(--space-1); }
+
+.formatView { margin-bottom: var(--space-1); }
+
+/* The player column reads left to right; the shared table header is right-aligned. */
+table thead th.headLeft { text-align: left; }
+
+/* Sortable column headers: plain buttons that inherit the th look. */
+.sortButton {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  /* Grows the tap area into the header cell's own padding. */
+  padding: var(--space-2) var(--space-1);
+  margin: calc(var(--space-2) * -1) calc(var(--space-1) * -1);
+  min-height: var(--tap-target);
+  display: inline-flex;
+  align-items: center;
+}
+
+.sortButton:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.sortActive {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The name column takes whatever width is left and truncates long names,
+   instead of pushing the numbers off a narrow screen. */
+.nameCol {
+  width: 100%;
+  max-width: 0;
+}
+
+/* Short counts still get a column wide enough to read and to tap. */
+.countCol { min-width: 2rem; }

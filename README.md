@@ -34,6 +34,7 @@ aufs Handy und kann Ergebnisse eintragen. Mehr dazu in
 | **Elo pro Turnier** | Jeder Spieler hat eine Start-Elo, die sich mit jedem Ergebnis fortschreibt. Wertungen gehören zum Turnier, nicht global. |
 | **Bo1 oder Bo3** | Freie Spiele gehen über einen Satz oder Best of 3, K.o.-Spiele immer Best of 3. Die Sätze werden einzeln eingetragen, jeder zählt für die Elo, und nach zwei gewonnenen Sätzen ist die Serie entschieden. |
 | **Spieler übernehmen** | Ein neues Turnier kann die Spielerliste eines alten klonen &mdash; mit der aktuellen oder der ursprünglichen Wertung als neue Start-Elo. |
+| **Tabelle** | Nach Elo, Name, Spielen, Siegen oder Siegquote sortierbar, wahlweise nur für Bo1- oder Bo3-Spiele. Der Rang bleibt immer der Elo-Platz. |
 | **Ergebnisbild** | Podium, Elo-Verlauf und Siegbilanz als PNG zum Teilen. |
 | **Öffentliche Turniere** | Beim Anlegen *Öffentlich* wählen, QR-Code zeigen, fertig: Wer ihn scannt, hat das Turnier live auf dem eigenen Handy und kann Ergebnisse eintragen, Spiele ansetzen und Spieler hinzufügen. Kein Account, der Link ist der Schlüssel. |
 | **Admin-Passwort** | Optional pro öffentlichem Turnier. Es sperrt alles Zerstörerische: Spieler oder gespielte Ergebnisse löschen, Regeln und Start-Elo ändern, Timer und K.o. starten oder verwerfen, das Turnier beenden oder für alle löschen. Ergebnisse eintragen bleibt für alle offen. |

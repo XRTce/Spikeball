@@ -146,21 +146,23 @@
 }
 
 /*
- * Phone-width standings. The rating is the reason the table exists, so rather
- * than letting the row scroll sideways the two most redundant cells - matches
- * played and the recent-form dots - are dropped on narrow screens. Both are
- * still shown in full on the player detail screen.
+ * Phone-width standings: tighter horizontal padding so every column fits at
+ * 360px without hiding any or scrolling sideways (the app is mobile first).
  */
-.compact th:nth-child(3),
-.compact td:nth-child(3) {
-  display: none;
+.table.compact thead th,
+.table.compact tbody td {
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
 }
 
-@media (min-width: 26rem) {
-  .compact th:nth-child(3),
-  .compact td:nth-child(3) {
-    display: table-cell;
-  }
+.table.compact thead th:first-child,
+.table.compact tbody td:first-child {
+  padding-left: var(--space-2);
+}
+
+.table.compact thead th:last-child,
+.table.compact tbody td:last-child {
+  padding-right: var(--space-2);
 }
 
 .nameText {
