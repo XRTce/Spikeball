@@ -164,7 +164,13 @@ export function TableScreen() {
                         {SORT_COLUMNS.map(({ key, label, name }) => (
                           <th
                             key={key}
-                            className={key === 'name' ? css.headLeft : undefined}
+                            className={
+                              key === 'name'
+                                ? cx(css.headLeft, css.nameCol)
+                                : key === 'played' || key === 'wins'
+                                  ? css.countCol
+                                  : undefined
+                            }
                             aria-sort={
                               sortKey === key
                                 ? key === 'name'
@@ -213,7 +219,7 @@ export function TableScreen() {
                                 index + 1
                               )}
                             </td>
-                            <td>
+                            <td className={css.nameCol}>
                               <span className={nameCellClass}>
                                 <Avatar
                                   name={row.name}
@@ -221,17 +227,21 @@ export function TableScreen() {
                                   size={26}
                                   color={colors.varOf(row.playerId)}
                                 />
-                                <span className={nameTextClass}>{row.name}</span>
-                                <span className={css.form}>
-                                  {row.form.map((won, i) => (
-                                    <span
-                                      key={i}
-                                      className={cx(
-                                        css.formDot,
-                                        won ? css.formWin : css.formLoss,
-                                      )}
-                                    />
-                                  ))}
+                                <span className={css.nameStack}>
+                                  <span className={nameTextClass}>{row.name}</span>
+                                  {row.form.length > 0 && (
+                                    <span className={css.form}>
+                                      {row.form.map((won, i) => (
+                                        <span
+                                          key={i}
+                                          className={cx(
+                                            css.formDot,
+                                            won ? css.formWin : css.formLoss,
+                                          )}
+                                        />
+                                      ))}
+                                    </span>
+                                  )}
                                 </span>
                               </span>
                             </td>
@@ -243,7 +253,10 @@ export function TableScreen() {
                                 : `${Math.round(stats.winRate * 100)}%`}
                             </td>
                             <td>
-                              {row.elo} <EloDelta value={row.eloChange} showZero={false} />
+                              <span className={css.eloStack}>
+                                {row.elo}
+                                <EloDelta value={row.eloChange} showZero={false} />
+                              </span>
                             </td>
                           </tr>
                         );
